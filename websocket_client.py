@@ -122,21 +122,38 @@ def place_trailing_stop_buy_order(symbol, size, activation_price):
 def place_trailing_stop_sell_order(symbol, size, activation_price):
     """Places a trailing stop sell order using Bitget V2 API."""
     
-    endpoint = "/api/v2/spot/trade/place-plan-order"
+    endpoint = "/api/v2/mix/order/place-plan-order"
 
     client_oid = str(uuid.uuid4())  # ✅ Unique order ID
 
+    # order_data = {
+    #     "symbol": symbol,
+    #     "side": "sell",
+    #     "orderType": "market",
+    #     "size": str(size),
+    #     "triggerPrice": str(activation_price),
+    #     "rangeRate": "0.01",  # 1% trailing stop
+    #     "triggerType": "mark_price",
+    #     "force": "gtc",
+    #     "clientOid": client_oid
+    # }
+
     order_data = {
-        "symbol": symbol,
-        "side": "sell",
-        "orderType": "market",
-        "size": str(size),
-        "triggerPrice": str(activation_price),
-        "rangeRate": "0.01",  # 1% trailing stop
-        "triggerType": "mark_price",
-        "force": "gtc",
-        "clientOid": client_oid
-    }
+            "planType": "track_plan",  # Trailing stop order
+            "delegateType": "track",
+            "symbol": symbol,
+            "productType": "COIN-FUTURES",  # e.g., "UMCBL" for USDT-M futures
+            "marginMode": "isolated",
+            "marginCoin": "USDT",
+            "size": str(size),
+            "triggerPrice": str(activation_price),
+            "callbackRatio": str(0.01),  # Trailing percentage
+            "triggerType": "fill_price",  # or "mark_price"
+            "side": "sell",  # "buy" or "sell"
+            "orderType": "market",  # Trailing stop orders execute at market price
+            "reduceOnly": "no",  # "yes" or "no"
+            "clientOId": client_oid
+        }
 
     signature, timestamp = generate_rest_signature(API_SECRET, 'POST', endpoint, None, order_data)
 
