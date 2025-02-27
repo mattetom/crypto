@@ -23,9 +23,9 @@ API_SECRET = ""
 API_PASSPHRASE = ""
 
 # 🔹 Email configuration (for notifications)
-GMAIL_USER = ""
-GMAIL_PASSWORD = ""
-RECIPIENT_EMAIL = ""
+GMAIL_USER = "matteo.tomasini@gmail.com"
+GMAIL_PASSWORD = "zidy sjqc fyln skxu"
+RECIPIENT_EMAIL = "matteo.tomasini@gmail.com"
 
 # 🔹 Bitget WebSocket URL (Production for SPOT)
 # BITGET_WS_URL = "wss://ws.bitget.com/spot/v1/stream"
@@ -119,41 +119,26 @@ def place_trailing_stop_buy_order(symbol, size, activation_price):
 
     return response_data
 
-def place_trailing_stop_sell_order(symbol, size, activation_price):
-    """Places a trailing stop sell order using Bitget V2 API."""
+def place_trailing_stop_open_long_order(symbol, size, activation_price):
+    """Places a trailing stop open long order using Bitget V2 API."""
     
     endpoint = "/api/v2/mix/order/place-plan-order"
-
     client_oid = str(uuid.uuid4())  # ✅ Unique order ID
 
-    # order_data = {
-    #     "symbol": symbol,
-    #     "side": "sell",
-    #     "orderType": "market",
-    #     "size": str(size),
-    #     "triggerPrice": str(activation_price),
-    #     "rangeRate": "0.01",  # 1% trailing stop
-    #     "triggerType": "mark_price",
-    #     "force": "gtc",
-    #     "clientOid": client_oid
-    # }
-
     order_data = {
-            "planType": "track_plan",  # Trailing stop order
-            "delegateType": "track",
-            "symbol": symbol,
-            "productType": "COIN-FUTURES",  # e.g., "UMCBL" for USDT-M futures
-            "marginMode": "isolated",
-            "marginCoin": "USDT",
-            "size": str(size),
-            "triggerPrice": str(activation_price),
-            "callbackRatio": str(0.01),  # Trailing percentage
-            "triggerType": "fill_price",  # or "mark_price"
-            "side": "sell",  # "buy" or "sell"
-            "orderType": "market",  # Trailing stop orders execute at market price
-            "reduceOnly": "no",  # "yes" or "no"
-            "clientOId": client_oid
-        }
+        "planType": "track_plan",
+        "symbol": symbol,
+        "productType": "usdt-futures",
+        "marginMode": "isolated",
+        "marginCoin": "USDT",
+        "size": size,
+        "callbackRatio": 0.01,
+        "triggerPrice": activation_price,
+        "triggerType": "mark_price",
+        "side": "buy",
+        "tradeSide": "open",
+        "orderType": "market"
+    }
 
     signature, timestamp = generate_rest_signature(API_SECRET, 'POST', endpoint, None, order_data)
 
@@ -172,6 +157,43 @@ def place_trailing_stop_sell_order(symbol, size, activation_price):
 
     return response_data
 
+def place_trailing_stop_close_long_order(symbol, size, activation_price):
+    """Places a trailing stop close long order using Bitget V2 API."""
+    
+    endpoint = "/api/v2/mix/order/place-plan-order"
+    client_oid = str(uuid.uuid4())  # ✅ Unique order ID
+
+    order_data = {
+        "planType": "track_plan",
+        "symbol": symbol,
+        "productType": "usdt-futures",
+        "marginMode": "isolated",
+        "marginCoin": "USDT",
+        "size": size,
+        "callbackRatio": 0.01,
+        "triggerPrice": activation_price,
+        "triggerType": "mark_price",
+        "side": "sell",
+        "tradeSide": "close",
+        "orderType": "market"
+    }
+
+    signature, timestamp = generate_rest_signature(API_SECRET, 'POST', endpoint, None, order_data)
+
+    headers = {
+        "ACCESS-KEY": API_KEY,
+        "ACCESS-SIGN": signature,
+        "ACCESS-TIMESTAMP": str(timestamp),  # ✅ Must match requestTime
+        "ACCESS-PASSPHRASE": API_PASSPHRASE,
+        "locale": "en-US",
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(BITGET_API_URL + endpoint, headers=headers, json=order_data)
+    response_data = response.json()
+    print(f"🚀 Trailing Stop Sell Order Placed: {response_data}")
+
+    return response_data
 
 def send_email(order_details, sell_price=None, size=None, order_type=""):
     """Sends an email when a buy/sell order is filled."""
@@ -307,7 +329,7 @@ def on_message(ws, message):
                 activation_price = round(price * 1.045, 6)
 
                 # Place Trailing Stop Sell Order
-                sell_response = place_trailing_stop_sell_order(symbol, size, activation_price)
+                sell_response = place_trailing_stop_close_long_order(symbol, size, activation_price)
 
                 # Send Email
                 send_email(order_details, activation_price, size, "TRAILING STOP SELL")
@@ -355,7 +377,7 @@ if __name__ == "__main__":
     print("🚀 Starting WebSocket Client for Bitget...")
     # threading.Thread(target=send_ping, daemon=True).start()
     # reconnect_websocket()
-    place_trailing_stop_sell_order("PIUSDT", 50, 2)
+    # place_trailing_stop_close_long_order("IPUSDT", 1, 6)
 
 
 
