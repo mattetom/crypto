@@ -23,9 +23,9 @@ API_SECRET = ""
 API_PASSPHRASE = ""
 
 # 🔹 Email configuration (for notifications)
-GMAIL_USER = "matteo.tomasini@gmail.com"
-GMAIL_PASSWORD = "zidy sjqc fyln skxu"
-RECIPIENT_EMAIL = "matteo.tomasini@gmail.com"
+GMAIL_USER = ""
+GMAIL_PASSWORD = ""
+RECIPIENT_EMAIL = ""
 
 # 🔹 Bitget WebSocket URL (Production for SPOT)
 # BITGET_WS_URL = "wss://ws.bitget.com/spot/v1/stream"
@@ -132,7 +132,7 @@ def place_trailing_stop_open_long_order(symbol, size, activation_price):
         "marginMode": "isolated",
         "marginCoin": "USDT",
         "size": size,
-        "callbackRatio": 0.01,
+        "callbackRatio": 0.1,
         "triggerPrice": activation_price,
         "triggerType": "mark_price",
         "side": "buy",
@@ -170,7 +170,7 @@ def place_trailing_stop_close_long_order(symbol, size, activation_price):
         "marginMode": "isolated",
         "marginCoin": "USDT",
         "size": size,
-        "callbackRatio": 0.01,
+        "callbackRatio": 0.1,
         "triggerPrice": activation_price,
         "triggerType": "mark_price",
         "side": "sell",
@@ -234,6 +234,40 @@ def send_email(order_details, sell_price=None, size=None, order_type=""):
     except Exception as e:
         print(f"❌ Error sending email: {str(e)}")
 
+def send_email_futures(details, sell_price=None, size=None, order_type=""):
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = GMAIL_USER
+        msg["To"] = RECIPIENT_EMAIL
+        # Use a more generic subject if it's for positions.
+        msg["Subject"] = f"📩 {order_type} Notification"
+
+        body = f"""
+        <html>
+        <body>
+            <h2>{order_type} Details</h2>
+            <p>{details}</p>
+        """
+
+        if sell_price and size:
+            body += f"""
+            <h2>New order</h2>
+            <p><b>Price:</b> {sell_price}</p>
+            <p><b>Size:</b> {size}</p>
+            """
+
+        body += "</body></html>"
+        msg.attach(MIMEText(body, "html"))
+
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(GMAIL_USER, GMAIL_PASSWORD)
+        server.sendmail(GMAIL_USER, RECIPIENT_EMAIL, msg.as_string())
+        server.quit()
+
+        print(f"✅ Email sent: {order_type} for {details.get('instId', 'N/A')}")
+    except Exception as e:
+        print(f"❌ Error sending email: {str(e)}")
 
 def send_ping():
     """Sends 'ping' every 30 seconds and reconnects if no 'pong' received."""
@@ -329,7 +363,7 @@ def on_message(ws, message):
                 activation_price = round(price * 1.045, 6)
 
                 # Place Trailing Stop Sell Order
-                sell_response = place_trailing_stop_close_long_order(symbol, size, activation_price)
+                # sell_response = place_trailing_stop_close_long_order(symbol, size, activation_price)
 
                 # Send Email
                 send_email(order_details, activation_price, size, "TRAILING STOP SELL")
@@ -341,10 +375,16 @@ def on_message(ws, message):
                 buy_activation_price = round(price * 0.955, 6)
 
                 # Place Trailing Stop Buy Order
-                buy_response = place_trailing_stop_buy_order(symbol, size, buy_activation_price)
+                # buy_response = place_trailing_stop_buy_order(symbol, size, buy_activation_price)
 
                 # Send Email
                 send_email(order_details, buy_activation_price, size, "TRAILING STOP BUY")
+
+    if "arg" in data and data["arg"].get("channel") == "positions":
+        position_info = data.get("data", [])
+        for pos in position_info:
+            # Depending on the data structure, check for an 'open' status or similar flag.
+            send_email_futures(pos, None, None, "FUTURE ORDER")
 
 def on_open(ws):
     """Authenticates and subscribes to private SPOT orders."""
@@ -359,7 +399,15 @@ def on_open(ws):
     ws.send(json.dumps(auth_payload))
     time.sleep(1)
 
-    subscribe_payload = {"op": "subscribe", "args": [{"instType": "SPOT", "channel": "orders"}]}
+    # subscribe_payload = {"op": "subscribe", "args": [{"instType": "SPOT", "channel": "orders"}]}
+    subscribe_payload = {
+        "op": "subscribe",
+        "args": [{
+            "instType": "USDT-FUTURES",    # or "FUTURES", based on Bitget's docs for your account type
+            "channel": "positions",
+            "instId": "default"
+        }]
+    }
     ws.send(json.dumps(subscribe_payload))
 
 
@@ -375,8 +423,8 @@ def on_close(ws, close_status_code, close_msg):
 
 if __name__ == "__main__":
     print("🚀 Starting WebSocket Client for Bitget...")
-    # threading.Thread(target=send_ping, daemon=True).start()
-    # reconnect_websocket()
+    threading.Thread(target=send_ping, daemon=True).start()
+    reconnect_websocket()
     # place_trailing_stop_close_long_order("IPUSDT", 1, 6)
 
 
