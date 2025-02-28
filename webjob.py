@@ -9,7 +9,6 @@ import requests
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import os
 import uuid
 import json
 import hmac
@@ -17,21 +16,21 @@ import hashlib
 import base64
 
 
-# 🔹 Replace with your Bitget API credentials
+# Replace with your Bitget API credentials
 API_KEY = ""
 API_SECRET = ""
 API_PASSPHRASE = ""
 
-# 🔹 Email configuration (for notifications)
+# Email configuration (for notifications)
 GMAIL_USER = ""
 GMAIL_PASSWORD = ""
 RECIPIENT_EMAIL = ""
 
-# 🔹 Bitget WebSocket URL (Production for SPOT)
+# Bitget WebSocket URL (Production for SPOT)
 # BITGET_WS_URL = "wss://ws.bitget.com/spot/v1/stream"
 BITGET_WS_URL = "wss://ws.bitget.com/v2/ws/private"
 
-# 🔹 Bitget API Base URL
+# Bitget API Base URL
 BITGET_API_URL = "https://api.bitget.com"
 
 # Global variables to track ping/pong responses
@@ -404,7 +403,7 @@ def on_open(ws):
         "op": "subscribe",
         "args": [{
             "instType": "USDT-FUTURES",    # or "FUTURES", based on Bitget's docs for your account type
-            "channel": "positions",
+            "channel": "fill",
             "instId": "default"
         }]
     }
