@@ -17,14 +17,14 @@ import base64
 
 
 # Replace with your Bitget API credentials
-API_KEY = ""
-API_SECRET = ""
-API_PASSPHRASE = ""
+API_KEY = "bg_e56182fcd94fbd09a04db5e86b87acc0"
+API_SECRET = "9ad2ea92a20eca343bd9ed055187099798c0d857bb81272fe8cbb7c2dd793b56"
+API_PASSPHRASE = "jdjdjsuweh393nqjsjdif923uq7shdjk"
 
 # Email configuration (for notifications)
-GMAIL_USER = ""
-GMAIL_PASSWORD = ""
-RECIPIENT_EMAIL = ""
+GMAIL_USER = "matteo.tomasini@gmail.com"
+GMAIL_PASSWORD = "mhhu mmnj kwfl wbhu"
+RECIPIENT_EMAIL = "matteo.tomasini@gmail.com"
 
 # Bitget WebSocket URL (Production for SPOT)
 # BITGET_WS_URL = "wss://ws.bitget.com/spot/v1/stream"
