@@ -55,7 +55,7 @@ def sign(message, secret_key):
   return base64.b64encode(d)
 
 
-def pre_hash(timestamp, method, request_path, body):
+def pre_hash(timestamp, method, request_path, query_params=None, body=None):
   return str(timestamp) + str.upper(method) + request_path + body
 
 
