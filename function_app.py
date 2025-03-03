@@ -105,6 +105,7 @@ def get_futures_open_position(symbol):
 def send_email(subject, body, to_email):
     from_email = ""
     password = ""
+
     msg = MIMEMultipart()
     msg["From"] = from_email
     msg["To"] = to_email
@@ -180,7 +181,7 @@ def place_trailing_stop_order(symbol, size, side, trigger_price):
         "size": size,
         "callbackRatio": 0.5,
         "triggerPrice": trigger_price,
-        "triggerType": "mark_price",
+        "triggerType": "fill_price",
         "side": side,
         "tradeSide": "close",
         "orderType": "market",
@@ -240,8 +241,16 @@ def get_order_details(symbol, order_id):
         "Content-Type": "application/json"
     }
 
-    response = requests.get(BITGET_API_URL + request_path, headers=headers)
-    return response.json()
+    start_time = time.time()
+    while time.time() - start_time < 10:
+        response = requests.get(BITGET_API_URL + request_path, headers=headers)
+        order_details = response.json()
+        if response.status_code == 200 and order_details.get("data"):
+            return order_details
+        time.sleep(1)  # Wait for 1 second before retrying
+
+    logging.error(f"Failed to fetch order details for order_id: {order_id}")
+    return None
 
 def place_stop_loss_order(symbol, size, side, stop_price):
     """Places a stop loss order using Bitget V2 API."""
