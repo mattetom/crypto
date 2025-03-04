@@ -312,7 +312,8 @@ def get_symbol_precision(symbol):
         if symbols_data.get("data"):
             symbol_data = symbols_data["data"][0]
             price_precision = int(symbol_data["pricePlace"])
-            return price_precision
+            size_precision = int(symbol_data["volumePlace"])
+            return symbol_data, price_precision, size_precision
     return None
 
 def place_market_order(symbol, size, side):
@@ -329,6 +330,9 @@ def place_market_order(symbol, size, side):
         logging.info(f"Reversed position response: {reverse_response}")
         return reverse_response
     
+    
+    symbol, price_precision, size_precision = get_symbol_precision(symbol)
+
     endpoint = "/api/v2/mix/order/place-order"
     client_oid = str(uuid.uuid4())  # Unique order ID
 
@@ -337,7 +341,7 @@ def place_market_order(symbol, size, side):
         "productType": "USDT-FUTURES",
         "marginMode": "isolated",
         "marginCoin": "USDT",
-        "size": size,
+        "size": round(size, size_precision),
         "side": side,
         "tradeSide": "open",
         "orderType": "market",
@@ -366,7 +370,6 @@ def place_market_order(symbol, size, side):
        if order_details.get("data"):
             order_price = float(order_details["data"]["priceAvg"])
             size = float(order_details["data"]["size"])
-            price_precision = get_symbol_precision(symbol)
             trigger_price = round(order_price * 1.015 if side == "buy" else order_price * 0.985, price_precision)
             # stop_loss_price = round(order_price * 0.99 if side == "buy" else order_price * 1.01, price_precision)
             trailing_stop_side = "sell" if side == "sell" else "buy"
@@ -412,3 +415,44 @@ def open_short(req: func.HttpRequest) -> func.HttpResponse:
         logging.error(f"Error processing request: {e}")
         return func.HttpResponse("Internal Server Error", status_code=500)
 
+@app.function_name(name="open_long_v2")
+@app.route(route="open_long_v2", auth_level=func.AuthLevel.ANONYMOUS)
+def open_long_v2(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('Python HTTP trigger function processed a request.')
+
+    try:
+        req_body = req.get_json()
+        symbol = req_body.get("symbol")
+        value = req_body.get("value")
+        if not symbol or not value:
+            return func.HttpResponse("Symbol and value are required", status_code=400)
+
+        logging.info('open_long_v2 function called with symbol: %s and value: %s', symbol, value)
+        value = float(value)
+        # Open a future long position at market value
+        order_response = place_market_order(symbol, size=10, side="buy")
+        return func.HttpResponse(json.dumps(order_response), status_code=200, mimetype="application/json")
+    except Exception as e:
+        logging.error(f"Error processing request: {e}")
+        return func.HttpResponse("Internal Server Error", status_code=500)
+
+@app.function_name(name="open_short_v2")
+@app.route(route="open_short_v2", auth_level=func.AuthLevel.ANONYMOUS)
+def open_short_v2(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('Python HTTP trigger function processed a request.')
+
+    try:
+        req_body = req.get_json()
+        symbol = req_body.get("symbol")
+        value = req_body.get("value")
+        if not symbol or not value:
+            return func.HttpResponse("Symbol and value are required", status_code=400)
+
+        logging.info('open_short_v2 function called with symbol: %s and value: %s', symbol, value)
+        value = float(value)
+        # Open a future short position at market value
+        order_response = place_market_order(symbol, size=10/value, side="sell")
+        return func.HttpResponse(json.dumps(order_response), status_code=200, mimetype="application/json")
+    except Exception as e:
+        logging.error(f"Error processing request: {e}")
+        return func.HttpResponse("Internal Server Error", status_code=500)
