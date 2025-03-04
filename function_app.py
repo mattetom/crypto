@@ -179,7 +179,7 @@ def place_trailing_stop_order(symbol, size, side, trigger_price):
         "marginMode": "isolated",
         "marginCoin": "USDT",
         "size": size,
-        "callbackRatio": 0.5,
+        "callbackRatio": 0.15,
         "triggerPrice": trigger_price,
         "triggerType": "fill_price",
         "side": side,
@@ -311,41 +311,41 @@ def get_symbol_precision(symbol):
         symbols_data = response.json()
         if symbols_data.get("data"):
             symbol_data = symbols_data["data"][0]
+            symbol = symbol_data["symbol"]
             price_precision = int(symbol_data["pricePlace"])
             size_precision = int(symbol_data["volumePlace"])
-            return symbol_data, price_precision, size_precision
+            return symbol, price_precision, size_precision
     return None
 
-def place_market_order(symbol, size, side):
-    """Places a market order using Bitget V2 API and places a trailing stop order and stop loss order."""
+def get_open_orders(symbol):
+    timestamp = get_timestamp()
+    body = ""
+    request_path = "/api/v2/mix/order/orders-plan-pending"
+    params = {"symbol": symbol, "productType": "usdt-futures", "planType": "track_plan"}
+    request_path = request_path + parse_params_to_str(params) # Need to be sorted in ascending alphabetical order by key
+    signature = sign(pre_hash(timestamp, "GET", request_path, str(body)), API_SECRET)
+    print(signature)
+    headers = {
+        "ACCESS-KEY": API_KEY,
+        "ACCESS-SIGN": signature,
+        "ACCESS-TIMESTAMP": str(timestamp),
+        "ACCESS-PASSPHRASE": API_PASSPHRASE,
+        "locale": "en-US",
+        "Content-Type": "application/json"
+    }
 
-    # Check if there is an open position for the symbol
-    position = get_futures_open_position(symbol)
-    if position.get("data"):
-        logging.info(f"Position already open for symbol: {symbol} - Reversing position")
-        position_data = position["data"][0]
-        position_size = float(position_data["available"])
-        position_side = position_data["holdSide"]
-        reverse_response = reverse_position(symbol, position_size, "sell" if position_side == "short" else "buy")
-        logging.info(f"Reversed position response: {reverse_response}")
-        return reverse_response
-    
-    
-    symbol, price_precision, size_precision = get_symbol_precision(symbol)
+    response = requests.get(BITGET_API_URL + request_path, headers=headers)
+    return response.json()
 
-    endpoint = "/api/v2/mix/order/place-order"
-    client_oid = str(uuid.uuid4())  # Unique order ID
+def cancel_orders(symbol, order_ids):
+    endpoint = "/api/v2/mix/order/cancel-plan-order"
+    
+    order_id_list = [{"orderId": order_id} for order_id in order_ids]
 
     order_data = {
+        "orderIdList": order_id_list,
         "symbol": symbol,
-        "productType": "USDT-FUTURES",
-        "marginMode": "isolated",
-        "marginCoin": "USDT",
-        "size": round(size, size_precision),
-        "side": side,
-        "tradeSide": "open",
-        "orderType": "market",
-        "clientOid": client_oid,
+        "productType": "usdt-futures"
     }
 
     signature, timestamp = generate_rest_signature(API_SECRET, 'POST', endpoint, order_data)
@@ -361,16 +361,64 @@ def place_market_order(symbol, size, side):
 
     response = requests.post(BITGET_API_URL + endpoint, headers=headers, json=order_data)
     order_response = response.json()
-    logging.info(f"Market order response: {order_response}")
 
-    if response.status_code == 200 and order_response.get("data"):
+def place_market_order(symbol, size, side):
+    """Places a market order using Bitget V2 API and places a trailing stop order and stop loss order."""
+
+    symbol, price_precision, size_precision = get_symbol_precision(symbol)
+
+    # Check if there is an open position for the symbol
+    position = get_futures_open_position(symbol)
+    if position.get("data"):
+        logging.info(f"Position already open for symbol: {symbol} - Reversing position")
+        position_data = position["data"][0]
+        position_size = float(position_data["available"])
+        position_side = position_data["holdSide"]
+        # get all open orders related to the symbol and cancel them
+        open_orders = get_open_orders(symbol)
+        if open_orders.get("data"):
+            order_ids = [order["orderId"] for order in open_orders["data"]["entrustedList"]]
+            cancel_orders(symbol, order_ids)
+        order_response = reverse_position(symbol, position_size, "sell" if position_side == "short" else "buy")
+        logging.info(f"Reversed position response: {order_response}")
+    else:
+        logging.info(f"No open position for symbol: {symbol}")
+        endpoint = "/api/v2/mix/order/place-order"
+    
+        order_data = {
+            "symbol": symbol,
+            "productType": "USDT-FUTURES",
+            "marginMode": "isolated",
+            "marginCoin": "USDT",
+            "size": size,
+            "side": side,
+            "tradeSide": "open",
+            "orderType": "market"
+        }
+
+        signature, timestamp = generate_rest_signature(API_SECRET, 'POST', endpoint, order_data)
+
+        headers = {
+            "ACCESS-KEY": API_KEY,
+            "ACCESS-SIGN": signature,
+            "ACCESS-TIMESTAMP": str(timestamp),
+            "ACCESS-PASSPHRASE": API_PASSPHRASE,
+            "locale": "en-US",
+            "Content-Type": "application/json"
+        }
+
+        response = requests.post(BITGET_API_URL + endpoint, headers=headers, json=order_data)
+        order_response = response.json()
+        logging.info(f"Market order response: {order_response}")
+
+    if order_response.get("data"):
        order_id = order_response["data"]["orderId"]
-    # order_id="1279846032966557705"
+        # order_id="1279846032966557705"
        order_details = get_order_details(symbol, order_id)
        if order_details.get("data"):
             order_price = float(order_details["data"]["priceAvg"])
             size = float(order_details["data"]["size"])
-            trigger_price = round(order_price * 1.015 if side == "buy" else order_price * 0.985, price_precision)
+            trigger_price = round(order_price * 1.0075 if side == "buy" else order_price * 0.9925, price_precision)
             # stop_loss_price = round(order_price * 0.99 if side == "buy" else order_price * 1.01, price_precision)
             trailing_stop_side = "sell" if side == "sell" else "buy"
             stop_loss_side = "sell" if side == "sell" else "buy"
@@ -430,7 +478,8 @@ def open_long_v2(req: func.HttpRequest) -> func.HttpResponse:
         logging.info('open_long_v2 function called with symbol: %s and value: %s', symbol, value)
         value = float(value)
         # Open a future long position at market value
-        order_response = place_market_order(symbol, size=10, side="buy")
+        # order_response = place_market_order(symbol, size=10, side="buy")
+        order_response = ""
         return func.HttpResponse(json.dumps(order_response), status_code=200, mimetype="application/json")
     except Exception as e:
         logging.error(f"Error processing request: {e}")
@@ -451,7 +500,8 @@ def open_short_v2(req: func.HttpRequest) -> func.HttpResponse:
         logging.info('open_short_v2 function called with symbol: %s and value: %s', symbol, value)
         value = float(value)
         # Open a future short position at market value
-        order_response = place_market_order(symbol, size=10/value, side="sell")
+        # order_response = place_market_order(symbol, size=10/value, side="sell")
+        order_response = ""
         return func.HttpResponse(json.dumps(order_response), status_code=200, mimetype="application/json")
     except Exception as e:
         logging.error(f"Error processing request: {e}")
