@@ -7,15 +7,19 @@ import azure.functions as func
 import requests
 import uuid
 import smtplib
+import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 app = func.FunctionApp()
 
-API_KEY = ""
-API_SECRET = ""
-API_PASSPHRASE = ""
-BITGET_API_URL = "https://api.bitget.com"
+# Get settings from environment variables
+API_KEY = os.environ.get("API_KEY")
+API_SECRET = os.environ.get("API_SECRET")
+API_PASSPHRASE = os.environ.get("API_PASSPHRASE")
+BITGET_API_URL = os.environ.get("BITGET_API_URL", "https://api.bitget.com")
+EMAIL_FROM = os.environ.get("EMAIL_FROM")
+EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
 
 def get_timestamp():
   return int(time.time() * 1000)
@@ -103,8 +107,8 @@ def get_futures_open_position(symbol):
         return None
 
 def send_email(subject, body, to_email):
-    from_email = ""
-    password = ""
+    from_email = EMAIL_FROM
+    password = EMAIL_PASSWORD
 
     msg = MIMEMultipart()
     msg["From"] = from_email
@@ -152,20 +156,20 @@ def reverse_position(symbol, size, side):
     response = requests.post(BITGET_API_URL + endpoint, headers=headers, json=order_data)
     return response.json()
 
-# @app.function_name(name="orders_check")
-# @app.timer_trigger(schedule="0 */1 * * * *", arg_name="myTimer", run_on_startup=False,
-#               use_monitor=False) 
-# def orders_check(myTimer: func.TimerRequest) -> None:
-#     if myTimer.past_due:
-#         logging.info('The timer is past due!')
+@app.function_name(name="ping")
+@app.timer_trigger(schedule="0 4,9,14,19,24,29,34,39,44,49,54,59 * * * *", arg_name="myTimer", run_on_startup=False,
+              use_monitor=False) 
+def ping(myTimer: func.TimerRequest) -> None:
+    if myTimer.past_due:
+        logging.info('The timer is past due!')
 
-#     positions = get_futures_open_position('IPUSDT')
-#     if positions:
-#         logging.info(f"Fetched futures open positions: {positions}")
-#         email_body = json.dumps(positions, indent=4)
-#         send_email("Futures Open Positions", email_body, "matteo.tomasini@gmail.com")
+    # positions = get_futures_open_position('IPUSDT')
+    # if positions:
+    #     logging.info(f"Fetched futures open positions: {positions}")
+    #     email_body = json.dumps(positions, indent=4)
+    #     send_email("Futures Open Positions", email_body, "matteo.tomasini@gmail.com")
 
-#     logging.info('Python timer trigger function executed.')
+    logging.info('Python timer trigger function executed.')
 
 def place_trailing_stop_order(symbol, size, side, trigger_price):
     """Places a trailing stop order using Bitget V2 API."""
@@ -372,6 +376,10 @@ def place_market_order(symbol, size, side):
     if position.get("data"):
         logging.info(f"Position already open for symbol: {symbol} - Reversing position")
         position_data = position["data"][0]
+        position_direction = position_data["holdSide"]
+        if ((position_direction == 'long' and side == 'buy') or (position_direction == 'short' and side == 'sell')):
+            logging.info(f"Position already open for symbol: {symbol} and side: {position_direction}")
+            return None
         position_size = float(position_data["available"])
         position_side = position_data["holdSide"]
         # get all open orders related to the symbol and cancel them
@@ -440,6 +448,12 @@ def open_long(req: func.HttpRequest) -> func.HttpResponse:
         logging.info('open_long function called with symbol: %s', symbol) 
         # Open a future long position at market value
         order_response = place_market_order(symbol, size=10, side="buy")
+        
+        if order_response is None:
+            return func.HttpResponse(json.dumps({"message": "No order was executed or position already exists"}), 
+                                    status_code=200, 
+                                    mimetype="application/json")
+                                    
         return func.HttpResponse(json.dumps(order_response), status_code=200, mimetype="application/json")
     except Exception as e:
         logging.error(f"Error processing request: {e}")
@@ -458,6 +472,12 @@ def open_short(req: func.HttpRequest) -> func.HttpResponse:
         logging.info('open_short function called with symbol: %s', symbol) 
         # Open a future short position at market value
         order_response = place_market_order(symbol, size=10, side="sell")
+        
+        if order_response is None:
+            return func.HttpResponse(json.dumps({"message": "No order was executed or position already exists"}), 
+                                    status_code=200, 
+                                    mimetype="application/json")
+                                    
         return func.HttpResponse(json.dumps(order_response), status_code=200, mimetype="application/json")
     except Exception as e:
         logging.error(f"Error processing request: {e}")
