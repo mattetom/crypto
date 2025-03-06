@@ -2,7 +2,6 @@ import logging
 import time
 import requests
 import uuid
-import json
 import os
 from utils import get_timestamp, sign, pre_hash, parse_params_to_str, generate_rest_signature
 
@@ -13,6 +12,7 @@ API_PASSPHRASE = os.environ.get("API_PASSPHRASE")
 BITGET_API_URL = os.environ.get("BITGET_API_URL", "https://api.bitget.com")
 
 def get_futures_open_positions():
+    logging.info("Fetching futures open positions")
     timestamp = get_timestamp()
     body = ""
     request_path = "/api/v2/mix/position/all-position"
@@ -38,6 +38,7 @@ def get_futures_open_positions():
         return None
     
 def get_futures_open_position(symbol):
+    logging.info(f"Fetching futures open position for symbol: {symbol}")
     timestamp = get_timestamp()
     body = ""
     request_path = "/api/v2/mix/position/single-position"
@@ -63,6 +64,9 @@ def get_futures_open_position(symbol):
         return None
 
 def reverse_position(symbol, size, side):
+    """Reverses the position for a given symbol using Bitget V2 API."""
+    logging.info(f"Reversing position for symbol: {symbol}, size: {size}, side: {side}")
+
     endpoint = "/api/v2/mix/order/click-backhand"
     client_oid = str(uuid.uuid4())  # Unique order ID
 
@@ -92,6 +96,8 @@ def reverse_position(symbol, size, side):
 
 def place_trailing_stop_order(symbol, size, side, trigger_price):
     """Places a trailing stop order using Bitget V2 API."""
+    logging.info(f"Placing trailing stop order for symbol: {symbol}, size: {size}, side: {side}, trigger_price: {trigger_price}")
+
     endpoint = "/api/v2/mix/order/place-plan-order"
     client_oid = str(uuid.uuid4())  # Unique order ID
 
@@ -125,28 +131,30 @@ def place_trailing_stop_order(symbol, size, side, trigger_price):
     response = requests.post(BITGET_API_URL + endpoint, headers=headers, json=order_data)
     return response.json()
 
-def test():
-    timestamp = get_timestamp()
-    body = ""
-    request_path = "/api/v2/mix/account/account"
-    params = {"symbol": "TRXUSDT", "marginCoin": "USDT", "productType": "usdt-futures"}
-    request_path = request_path + parse_params_to_str(params) # Need to be sorted in ascending alphabetical order by key
-    signature = sign(pre_hash(timestamp, "GET", request_path, str(body)), API_SECRET)
-    print(signature)
-    headers = {
-        "ACCESS-KEY": API_KEY,
-        "ACCESS-SIGN": signature,
-        "ACCESS-TIMESTAMP": str(timestamp),
-        "ACCESS-PASSPHRASE": API_PASSPHRASE,
-        "locale": "en-US",
-        "Content-Type": "application/json"
-    }
+# def test():
+#     timestamp = get_timestamp()
+#     body = ""
+#     request_path = "/api/v2/mix/account/account"
+#     params = {"symbol": "TRXUSDT", "marginCoin": "USDT", "productType": "usdt-futures"}
+#     request_path = request_path + parse_params_to_str(params) # Need to be sorted in ascending alphabetical order by key
+#     signature = sign(pre_hash(timestamp, "GET", request_path, str(body)), API_SECRET)
+#     print(signature)
+#     headers = {
+#         "ACCESS-KEY": API_KEY,
+#         "ACCESS-SIGN": signature,
+#         "ACCESS-TIMESTAMP": str(timestamp),
+#         "ACCESS-PASSPHRASE": API_PASSPHRASE,
+#         "locale": "en-US",
+#         "Content-Type": "application/json"
+#     }
 
-    response = requests.get(BITGET_API_URL + request_path, headers=headers)
-    return response.json()
+#     response = requests.get(BITGET_API_URL + request_path, headers=headers)
+#     return response.json()
 
 def get_order_details(symbol, order_id):
     """Retrieves order details using Bitget V2 API."""
+    logging.info(f"Fetching order details for order_id: {order_id}")
+
     timestamp = get_timestamp()
     body = ""
     request_path = "/api/v2/mix/order/detail"
@@ -176,6 +184,8 @@ def get_order_details(symbol, order_id):
 
 def place_stop_loss_order(symbol, size, side, stop_price):
     """Places a stop loss order using Bitget V2 API."""
+    logging.info(f"Placing stop loss order for symbol: {symbol}, size: {size}, side: {side}, stop_price: {stop_price}")
+
     endpoint = "/api/v2/mix/order/place-plan-order"
     client_oid = str(uuid.uuid4())  # Unique order ID
 
@@ -212,6 +222,8 @@ def place_stop_loss_order(symbol, size, side, stop_price):
 
 def get_symbol_precision(symbol):
     """Fetches the precision for a given symbol from Bitget API V2."""
+    logging.info(f"Fetching symbol precision for symbol: {symbol}")
+
     timestamp = get_timestamp()
     body = ""
     request_path = "/api/v2/mix/market/contracts"
@@ -240,6 +252,9 @@ def get_symbol_precision(symbol):
     return None
 
 def get_open_orders(symbol):
+    """Fetches open orders for a given symbol from Bitget API V2."""
+    logging.info(f"Fetching open orders for symbol: {symbol}")
+
     timestamp = get_timestamp()
     body = ""
     request_path = "/api/v2/mix/order/orders-plan-pending"
@@ -260,10 +275,11 @@ def get_open_orders(symbol):
     return response.json()
 
 def cancel_orders(symbol, order_ids):
-    endpoint = "/api/v2/mix/order/cancel-plan-order"
-    
-    order_id_list = [{"orderId": order_id} for order_id in order_ids]
+    """Cancels orders using Bitget V2 API."""
+    logging.info(f"Cancelling orders for symbol: {symbol}, order_ids: {order_ids}")
 
+    endpoint = "/api/v2/mix/order/cancel-plan-order"
+    order_id_list = [{"orderId": order_id} for order_id in order_ids]
     order_data = {
         "orderIdList": order_id_list,
         "symbol": symbol,
@@ -286,6 +302,7 @@ def cancel_orders(symbol, order_ids):
 
 def place_market_order(symbol, size, side):
     """Places a market order using Bitget V2 API and places a trailing stop order and stop loss order."""
+    logging.info(f"Placing market order for symbol: {symbol}, size: {size}, side: {side}")
 
     symbol_info = get_symbol_precision(symbol)
     if not symbol_info:
@@ -349,10 +366,10 @@ def place_market_order(symbol, size, side):
             order_price = float(order_details["data"]["priceAvg"])
             size = float(order_details["data"]["size"])
             trigger_price = round(order_price * 1.0075 if side == "buy" else order_price * 0.9925, price_precision)
-            # stop_loss_price = round(order_price * 0.99 if side == "buy" else order_price * 1.01, price_precision)
+            stop_loss_price = round(order_price * 0.9925 if side == "buy" else order_price * 1.075, price_precision)
             trailing_stop_side = "sell" if side == "buy" else "buy"
-            # stop_loss_side = "sell" if side == "buy" else "buy"
+            stop_loss_side = "sell" if side == "buy" else "buy"
             place_trailing_stop_order(symbol, size, trailing_stop_side, trigger_price)
-            # place_stop_loss_order(symbol, size, stop_loss_side, stop_loss_price)
+            place_stop_loss_order(symbol, size, stop_loss_side, stop_loss_price)
 
     return order_details

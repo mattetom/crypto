@@ -2,6 +2,7 @@ import base64
 import hmac
 import json
 import time
+import logging
 
 def get_timestamp():
   return int(time.time() * 1000)
@@ -34,6 +35,7 @@ def toQueryWithNoEncode(params):
 
 
 def generate_rest_signature(secret_key, method, request_path, body=None):
+  logging.info(f"Generating signature for {method} {request_path}")
   timestamp = get_timestamp()
   bodyJson = json.dumps(body)
   signature = sign(pre_hash(timestamp, method, request_path, str(bodyJson)), secret_key)

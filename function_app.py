@@ -7,7 +7,7 @@ from email_utils import send_email
 app = func.FunctionApp()
 
 @app.function_name(name="ping")
-@app.timer_trigger(schedule="0 4,9,14,19,24,29,34,39,44,49,54,59 * * * *", arg_name="myTimer", run_on_startup=False,
+@app.timer_trigger(schedule="30 4,9,14,19,24,29,34,39,44,49,54,59 * * * *", arg_name="myTimer", run_on_startup=False,
               use_monitor=False) 
 def ping(myTimer: func.TimerRequest) -> None:
     if myTimer.past_due:
