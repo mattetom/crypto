@@ -7,11 +7,11 @@
         "isEnabled": true,
         "excludedTypes": "Request"
       }
-    },
-    "logLevel": {
-      "default": "Information",
-      "Function": "Information",
-      "Host.Aggregator": "Information"
+    }
+  },
+  "extensions": {
+    "http": {
+      "routePrefix": "api"
     }
   },
   "extensionBundle": {

@@ -341,7 +341,8 @@ def place_market_order(symbol, size, side):
             "size": size,
             "side": side,
             "tradeSide": "open",
-            "orderType": "market"
+            "orderType": "market",
+
         }
 
         signature, timestamp = generate_rest_signature(API_SECRET, 'POST', endpoint, order_data)
@@ -370,6 +371,71 @@ def place_market_order(symbol, size, side):
             trailing_stop_side = "sell" if side == "buy" else "buy"
             stop_loss_side = "sell" if side == "buy" else "buy"
             place_trailing_stop_order(symbol, size, trailing_stop_side, trigger_price)
-            place_stop_loss_order(symbol, size, stop_loss_side, stop_loss_price)
+            # place_stop_loss_order(symbol, size, stop_loss_side, stop_loss_price)
+            modify_market_order(symbol, order_id, stop_loss_price)
 
     return order_details
+
+def modify_market_order(symbol, order_id, stop_loss_price):
+    """Modifies a market order using Bitget V2 API."""
+    logging.info(f"Modifying market order for symbol: {symbol}, order_id: {order_id}, stop_loss_price: {stop_loss_price}")
+
+    endpoint = "/api/v2/mix/order/modify-order"
+    
+    order_data = {
+        "symbol": symbol,
+        "productType": "USDT-FUTURES",
+        "newPresetStopLossPrice": stop_loss_price
+    }
+
+    signature, timestamp = generate_rest_signature(API_SECRET, 'POST', endpoint, order_data)
+
+    headers = {
+        "ACCESS-KEY": API_KEY,
+        "ACCESS-SIGN": signature,
+        "ACCESS-TIMESTAMP": str(timestamp),
+        "ACCESS-PASSPHRASE": API_PASSPHRASE,
+        "locale": "en-US",
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(BITGET_API_URL + endpoint, headers=headers, json=order_data)
+    order_response = response.json()
+    logging.info(f"Update market order response: {order_response}")
+
+def get_bitget_klines(symbol, interval, limit=100):
+    """
+    Get historical klines (candlestick data) from BitGet V2 API
+    """
+    logging.info(f"Fetching klines for symbol: {symbol}, interval: {interval}, limit: {limit}")
+
+    timestamp = get_timestamp()
+    body = ""
+    request_path = "/api/v2/mix/market/candles"
+    params = {"symbol": symbol, "productType": "usdt-futures", "granularity": interval, "limit": str(limit)}
+    request_path = request_path + parse_params_to_str(params) # Need to be sorted in ascending alphabetical order by key
+    signature = sign(pre_hash(timestamp, "GET", request_path, str(body)), API_SECRET)
+    print(signature)
+    headers = {
+        "ACCESS-KEY": API_KEY,
+        "ACCESS-SIGN": signature,
+        "ACCESS-TIMESTAMP": str(timestamp),
+        "ACCESS-PASSPHRASE": API_PASSPHRASE,
+        "locale": "en-US",
+        "Content-Type": "application/json"
+    }
+    try:
+        response = requests.get(BITGET_API_URL + request_path, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("code") == "00000":
+                return data.get("data", [])
+            else:
+                logging.error(f"BitGet API error: {data.get('msg')}")
+                return None
+        else:
+            logging.error(f"BitGet API request failed with status code: {response.status_code}")
+            return None
+    except Exception as e:
+        logging.error(f"Error fetching klines from BitGet: {e}")
+        return None

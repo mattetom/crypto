@@ -6,7 +6,5 @@
     "azureFunctions.projectRuntime": "~4",
     "debug.internalConsoleOptions": "neverOpen",
     "azureFunctions.projectLanguageModel": 2,
-    "python.analysis.extraPaths": [
-        "./bitget-python-sdk-api"
-    ]
+    "python.analysis.extraPaths": []
 }
