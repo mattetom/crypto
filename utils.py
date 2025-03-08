@@ -1,10 +1,15 @@
 import base64
+from collections import deque
 import hmac
 import json
+import os
+import pickle
 import time
 import logging
 
 import numpy as np
+
+from azure.storage.blob import BlobServiceClient, BlobClient
 
 def get_timestamp():
   return int(time.time() * 1000)
@@ -92,3 +97,45 @@ def calculate_ema(prices, period):
         ema[i] = (prices[i] - ema[i-1]) * multiplier + ema[i-1]
         
     return ema
+
+
+# Azure Blob Storage functions for state persistence
+def get_blob_client():
+    """Get a blob client for our state storage"""
+    connection_string = os.environ.get("AzureWebJobsStorage")
+    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+    container_name = "macd-state"
+    
+    # Create container if it doesn't exist
+    try:
+        container_client = blob_service_client.create_container(container_name)
+    except:
+        container_client = blob_service_client.get_container_client(container_name)
+    
+    return container_client.get_blob_client("macd-history")
+
+def load_state():
+    """Load MACD history from Azure Blob Storage"""
+    blob_client = get_blob_client()
+    
+    try:
+        downloaded_blob = blob_client.download_blob()
+        state_data = pickle.loads(downloaded_blob.readall())
+        logging.info("Successfully loaded MACD history from Blob Storage")
+        return state_data
+    except Exception as e:
+        logging.info(f"No existing state found or error loading state: {e}")
+        return {'macd_history': deque(maxlen=15), 
+                'last_bullish_action_time': None, 
+                'last_bearish_action_time': None}
+
+def save_state(state_data):
+    """Save MACD history to Azure Blob Storage"""
+    blob_client = get_blob_client()
+    
+    try:
+        serialized_data = pickle.dumps(state_data)
+        blob_client.upload_blob(serialized_data, overwrite=True)
+        logging.info("Successfully saved MACD history to Blob Storage")
+    except Exception as e:
+        logging.error(f"Error saving state to Blob Storage: {e}")

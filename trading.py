@@ -94,13 +94,12 @@ def reverse_position(symbol, size, side):
     response = requests.post(BITGET_API_URL + endpoint, headers=headers, json=order_data)
     return response.json()
 
-def place_trailing_stop_order(symbol, size, side, trigger_price):
+def place_trailing_stop_order(symbol, size, side, trigger_price, client_oid):
     """Places a trailing stop order using Bitget V2 API."""
     logging.info(f"Placing trailing stop order for symbol: {symbol}, size: {size}, side: {side}, trigger_price: {trigger_price}")
 
     endpoint = "/api/v2/mix/order/place-plan-order"
-    client_oid = str(uuid.uuid4())  # Unique order ID
-
+    
     order_data = {
         "planType": "track_plan",
         "symbol": symbol,
@@ -108,13 +107,15 @@ def place_trailing_stop_order(symbol, size, side, trigger_price):
         "marginMode": "isolated",
         "marginCoin": "USDT",
         "size": size,
-        "callbackRatio": 0.15,
+        "callbackRatio": 1,
         "triggerPrice": trigger_price,
-        "triggerType": "fill_price",
+        "triggerType": "mark_price",
         "side": side,
         "tradeSide": "close",
         "orderType": "market",
-        "clientOid": client_oid,
+        "clientOid": client_oid + "_ts",
+        "reduceOnly": "yes",
+        "stpMode": "cancel_both"
     }
 
     signature, timestamp = generate_rest_signature(API_SECRET, 'POST', endpoint, order_data)
@@ -130,26 +131,6 @@ def place_trailing_stop_order(symbol, size, side, trigger_price):
 
     response = requests.post(BITGET_API_URL + endpoint, headers=headers, json=order_data)
     return response.json()
-
-# def test():
-#     timestamp = get_timestamp()
-#     body = ""
-#     request_path = "/api/v2/mix/account/account"
-#     params = {"symbol": "TRXUSDT", "marginCoin": "USDT", "productType": "usdt-futures"}
-#     request_path = request_path + parse_params_to_str(params) # Need to be sorted in ascending alphabetical order by key
-#     signature = sign(pre_hash(timestamp, "GET", request_path, str(body)), API_SECRET)
-#     print(signature)
-#     headers = {
-#         "ACCESS-KEY": API_KEY,
-#         "ACCESS-SIGN": signature,
-#         "ACCESS-TIMESTAMP": str(timestamp),
-#         "ACCESS-PASSPHRASE": API_PASSPHRASE,
-#         "locale": "en-US",
-#         "Content-Type": "application/json"
-#     }
-
-#     response = requests.get(BITGET_API_URL + request_path, headers=headers)
-#     return response.json()
 
 def get_order_details(symbol, order_id):
     """Retrieves order details using Bitget V2 API."""
@@ -182,13 +163,12 @@ def get_order_details(symbol, order_id):
     logging.error(f"Failed to fetch order details for order_id: {order_id}")
     return None
 
-def place_stop_loss_order(symbol, size, side, stop_price):
+def place_stop_loss_order(symbol, size, side, stop_price, client_oid):
     """Places a stop loss order using Bitget V2 API."""
     logging.info(f"Placing stop loss order for symbol: {symbol}, size: {size}, side: {side}, stop_price: {stop_price}")
 
     endpoint = "/api/v2/mix/order/place-plan-order"
-    client_oid = str(uuid.uuid4())  # Unique order ID
-
+    
     order_data = {
         "planType": "normal_plan",
         "symbol": symbol,
@@ -203,7 +183,9 @@ def place_stop_loss_order(symbol, size, side, stop_price):
         "orderType": "market",
         "stopLossTriggerPrice": stop_price,
         "stopLossTriggerType": "mark_price",
-        "clientOid": client_oid,
+        "stpMode": "cancel_both",
+        "clientOid": client_oid + "_sl",
+        "reduceOnly": "yes"
     }
 
     signature, timestamp = generate_rest_signature(API_SECRET, 'POST', endpoint, order_data)
@@ -251,14 +233,14 @@ def get_symbol_precision(symbol):
             return symbol, price_precision, size_precision
     return None
 
-def get_open_orders(symbol):
+def get_open_orders(symbol, planType):
     """Fetches open orders for a given symbol from Bitget API V2."""
     logging.info(f"Fetching open orders for symbol: {symbol}")
 
     timestamp = get_timestamp()
     body = ""
     request_path = "/api/v2/mix/order/orders-plan-pending"
-    params = {"symbol": symbol, "productType": "usdt-futures", "planType": "track_plan"}
+    params = {"symbol": symbol, "productType": "usdt-futures", "planType": planType}
     request_path = request_path + parse_params_to_str(params) # Need to be sorted in ascending alphabetical order by key
     signature = sign(pre_hash(timestamp, "GET", request_path, str(body)), API_SECRET)
     print(signature)
@@ -272,7 +254,8 @@ def get_open_orders(symbol):
     }
 
     response = requests.get(BITGET_API_URL + request_path, headers=headers)
-    return response.json()
+    t = response.json()
+    return t
 
 def cancel_orders(symbol, order_ids):
     """Cancels orders using Bitget V2 API."""
@@ -298,7 +281,8 @@ def cancel_orders(symbol, order_ids):
     }
 
     response = requests.post(BITGET_API_URL + endpoint, headers=headers, json=order_data)
-    return response.json()
+    t = response.json()
+    return t
 
 def place_market_order(symbol, size, side):
     """Places a market order using Bitget V2 API and places a trailing stop order and stop loss order."""
@@ -323,15 +307,34 @@ def place_market_order(symbol, size, side):
         position_size = float(position_data["available"])
         position_side = position_data["holdSide"]
         # get all open orders related to the symbol and cancel them
-        open_orders = get_open_orders(symbol)
-        if open_orders.get("data"):
+        order_ids = []
+        logging.info(f"Canceling all open orders for symbol: {symbol}")
+        open_orders = get_open_orders(symbol, "normal_plan")
+        if open_orders.get("data") and open_orders["data"]["entrustedList"]:
             order_ids = [order["orderId"] for order in open_orders["data"]["entrustedList"]]
+        open_orders = get_open_orders(symbol, "track_plan")
+        if open_orders.get("data") and open_orders["data"]["entrustedList"]:
+            order_ids += [order["orderId"] for order in open_orders["data"]["entrustedList"]]
+        if order_ids:
             cancel_orders(symbol, order_ids)
         order_response = reverse_position(symbol, position_size, "sell" if position_side == "short" else "buy")
         logging.info(f"Reversed position response: {order_response}")
     else:
         logging.info(f"No open position for symbol: {symbol}")
+        # cancel all open orders for the symbol
+        order_ids = []
+        logging.info(f"Canceling all open orders for symbol: {symbol}")
+        open_orders = get_open_orders(symbol, "normal_plan")
+        if open_orders.get("data") and open_orders["data"]["entrustedList"]:
+            order_ids = [order["orderId"] for order in open_orders["data"]["entrustedList"]]
+        open_orders = get_open_orders(symbol, "track_plan")
+        if open_orders.get("data") and open_orders["data"]["entrustedList"]:
+            order_ids += [order["orderId"] for order in open_orders["data"]["entrustedList"]]
+        if order_ids:
+            cancel_orders(symbol, order_ids)
+        
         endpoint = "/api/v2/mix/order/place-order"
+        client_oid_prefix = f"oco_order_{int(time.time())}"
     
         order_data = {
             "symbol": symbol,
@@ -342,7 +345,7 @@ def place_market_order(symbol, size, side):
             "side": side,
             "tradeSide": "open",
             "orderType": "market",
-
+            "clientOid": client_oid_prefix + "_market"
         }
 
         signature, timestamp = generate_rest_signature(API_SECRET, 'POST', endpoint, order_data)
@@ -366,42 +369,14 @@ def place_market_order(symbol, size, side):
        if order_details.get("data"):
             order_price = float(order_details["data"]["priceAvg"])
             size = float(order_details["data"]["size"])
-            trigger_price = round(order_price * 1.0075 if side == "buy" else order_price * 0.9925, price_precision)
-            stop_loss_price = round(order_price * 0.9925 if side == "buy" else order_price * 1.075, price_precision)
-            trailing_stop_side = "sell" if side == "buy" else "buy"
-            stop_loss_side = "sell" if side == "buy" else "buy"
-            place_trailing_stop_order(symbol, size, trailing_stop_side, trigger_price)
-            # place_stop_loss_order(symbol, size, stop_loss_side, stop_loss_price)
-            modify_market_order(symbol, order_id, stop_loss_price)
-
+            trigger_price = round(order_price * 1.02 if side == "buy" else order_price * 0.98, price_precision)
+            stop_loss_price = round(order_price * 0.985 if side == "buy" else order_price * 1.015, price_precision)
+            trailing_stop_side = "sell" if side == "sell" else "buy"
+            stop_loss_side = "sell" if side == "sell" else "buy"
+            place_trailing_stop_order(symbol, size, trailing_stop_side, trigger_price, client_oid_prefix)
+            place_stop_loss_order(symbol, size, stop_loss_side, stop_loss_price, client_oid_prefix)
+            #modify_market_order(symbol, order_id, stop_loss_price)
     return order_details
-
-def modify_market_order(symbol, order_id, stop_loss_price):
-    """Modifies a market order using Bitget V2 API."""
-    logging.info(f"Modifying market order for symbol: {symbol}, order_id: {order_id}, stop_loss_price: {stop_loss_price}")
-
-    endpoint = "/api/v2/mix/order/modify-order"
-    
-    order_data = {
-        "symbol": symbol,
-        "productType": "USDT-FUTURES",
-        "newPresetStopLossPrice": stop_loss_price
-    }
-
-    signature, timestamp = generate_rest_signature(API_SECRET, 'POST', endpoint, order_data)
-
-    headers = {
-        "ACCESS-KEY": API_KEY,
-        "ACCESS-SIGN": signature,
-        "ACCESS-TIMESTAMP": str(timestamp),
-        "ACCESS-PASSPHRASE": API_PASSPHRASE,
-        "locale": "en-US",
-        "Content-Type": "application/json"
-    }
-
-    response = requests.post(BITGET_API_URL + endpoint, headers=headers, json=order_data)
-    order_response = response.json()
-    logging.info(f"Update market order response: {order_response}")
 
 def get_bitget_klines(symbol, interval, limit=100):
     """
