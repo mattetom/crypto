@@ -294,6 +294,8 @@ def place_market_order(symbol, size, side):
         return None
         
     symbol, price_precision, size_precision = symbol_info
+    
+    client_oid_prefix = f"oco_order_{int(time.time())}"
 
     # Check if there is an open position for the symbol
     position = get_futures_open_position(symbol)
@@ -334,7 +336,6 @@ def place_market_order(symbol, size, side):
             cancel_orders(symbol, order_ids)
         
         endpoint = "/api/v2/mix/order/place-order"
-        client_oid_prefix = f"oco_order_{int(time.time())}"
     
         order_data = {
             "symbol": symbol,
