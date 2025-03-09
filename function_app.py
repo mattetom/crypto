@@ -10,13 +10,14 @@ import utils
 app = func.FunctionApp()
 
 @app.timer_trigger(schedule="0 */1 * * * *", arg_name="myTimer", run_on_startup=False,
-              use_monitor=False, disabled=True) 
+              use_monitor=False, disabled=True)
 def calculate_macd(myTimer: func.TimerRequest) -> None:
     """
     Calculate MACD indicator for a symbol every minute using BitGet V2 API
     MACD parameters: fast=8, slow=18, signal=6
     """
-    logging.info('MACD calculation timer triggered')
+    logging.info('MACD calculation timer triggered but function is disabled')
+    return  # Early return to prevent execution
     
     # Load state from persistent storage
     state = utils.load_state()
