@@ -1,16 +1,16 @@
 from datetime import datetime, timedelta
 import json
 import logging
-import pandas as pd  # Fixed import for pandas
+import pandas as pd
 import azure.functions as func
 from email_utils import send_email
-from trading import get_bitget_klines, place_market_order
+from trading import calculate_indicators, check_trade_signal, get_bitget_klines, get_candles, place_market_order
 import utils
 
 app = func.FunctionApp()
 
 @app.timer_trigger(schedule="0 */1 * * * *", arg_name="myTimer", run_on_startup=False,
-              use_monitor=False) 
+              use_monitor=False, disabled=True) 
 def calculate_macd(myTimer: func.TimerRequest) -> None:
     """
     Calculate MACD indicator for a symbol every minute using BitGet V2 API
@@ -140,6 +140,26 @@ def calculate_macd(myTimer: func.TimerRequest) -> None:
             
     except Exception as e:
         logging.error(f"Error calculating MACD: {e}")
+
+@app.timer_trigger(schedule="0 */1 * * * *", arg_name="myTimer", run_on_startup=False,
+              use_monitor=False) 
+def calculate_strategyv2(myTimer: func.TimerRequest) -> None:
+    logging.info("Azure Function TradeBot avviato.")
+    SYMBOL = "WIFUSDT"
+    df_5m = get_candles(SYMBOL, "5m", limit=100)
+    df_1m = get_candles(SYMBOL, "1m", limit=100)
+    
+    if df_5m is not None and df_1m is not None:
+        df_5m = calculate_indicators(df_5m)
+        df_1m = calculate_indicators(df_1m)
+        
+        signal_5m, entry_price_5m, stop_loss_5m = check_trade_signal(df_5m)
+        signal_1m, entry_price_1m, stop_loss_1m = check_trade_signal(df_1m)
+        
+        if signal_5m == signal_1m and signal_5m is not None:
+            logging.info(f"📢 {signal_5m} ENTRY confirmed at {entry_price_5m:.4f} USDT")
+            logging.info(f"🔹 Stop Loss at {stop_loss_5m:.4f} USDT")
+            send_email(f"📢 {signal_5m} ENTRY confirmed at {entry_price_5m:.4f} USDT",f"Set Stop Loss at {stop_loss_5m:.4f} USDT", "matteo.tomasini@gmail.com")
 
 @app.route(route="open_long", auth_level=func.AuthLevel.ANONYMOUS)
 def open_long(req: func.HttpRequest) -> func.HttpResponse:

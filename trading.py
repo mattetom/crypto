@@ -1,5 +1,7 @@
 import logging
 import time
+import pandas as pd
+import ta
 import requests
 import uuid
 import os
@@ -415,3 +417,79 @@ def get_bitget_klines(symbol, interval, limit=100):
     except Exception as e:
         logging.error(f"Error fetching klines from BitGet: {e}")
         return None
+
+# Funzione per ottenere dati storici da BitGet
+def get_candles(symbol, interval, limit=100):
+    """
+    Get historical klines (candlestick data) from BitGet V2 API
+    """
+    logging.info(f"Fetching klines for symbol: {symbol}, interval: {interval}, limit: {limit}")
+
+    timestamp = get_timestamp()
+    body = ""
+    request_path = "/api/v2/mix/market/candles"
+    params = {"symbol": symbol, "productType": "usdt-futures", "granularity": interval, "limit": str(limit)}
+    request_path = request_path + parse_params_to_str(params) # Need to be sorted in ascending alphabetical order by key
+    signature = sign(pre_hash(timestamp, "GET", request_path, str(body)), API_SECRET)
+    print(signature)
+    headers = {
+        "ACCESS-KEY": API_KEY,
+        "ACCESS-SIGN": signature,
+        "ACCESS-TIMESTAMP": str(timestamp),
+        "ACCESS-PASSPHRASE": API_PASSPHRASE,
+        "locale": "en-US",
+        "Content-Type": "application/json"
+    }
+    response = requests.get(BITGET_API_URL + request_path, headers=headers)
+    data = response.json()
+    if "data" in data:
+        df = pd.DataFrame(data["data"], columns=["timestamp", "open", "high", "low", "close", "volumeBaseCoin", "volumeQuoteCoin"])
+        df = df.astype(float)
+        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+        return df
+    else:
+        logging.error("Errore nella richiesta API: %s", data)
+        return None
+
+# Funzione per calcolare indicatori tecnici
+def calculate_indicators(df):
+    """Calcola MACD, Stochastic RSI e ATR"""
+    df["close"] = df["close"].astype(float)
+
+    # MACD (7,14,5)
+    macd = ta.trend.MACD(df["close"], window_slow=14, window_fast=7, window_sign=5)
+    df["macd"] = macd.macd()
+    df["macd_signal"] = macd.macd_signal()
+
+    # Stochastic RSI (7,3,3)
+    stoch_rsi = ta.momentum.StochRSIIndicator(df["close"], window=7, smooth1=3, smooth2=3)
+    df["stoch_rsi_k"] = stoch_rsi.stochrsi_k()
+    df["stoch_rsi_d"] = stoch_rsi.stochrsi_d()
+
+    # ATR (7)
+    atr = ta.volatility.AverageTrueRange(df["high"], df["low"], df["close"], window=7)
+    df["atr"] = atr.average_true_range()
+
+    return df
+
+# Funzione per determinare segnali di trading
+def check_trade_signal(df):
+    """Usa solo la penultima candela chiusa per evitare falsi segnali"""
+    last_closed_candle = df.iloc[-2]  # Usa la penultima candela chiusa
+    prev_candle = df.iloc[-3]  # Ancora una più vecchia per confronto
+
+    if (
+        last_closed_candle["stoch_rsi_k"] > last_closed_candle["stoch_rsi_d"] and last_closed_candle["stoch_rsi_k"] < 20
+        and last_closed_candle["macd"] > last_closed_candle["macd_signal"]
+    ):
+        stop_loss = last_closed_candle["close"] - (1.5 * last_closed_candle["atr"])
+        return "LONG", last_closed_candle["close"], stop_loss
+
+    elif (
+        last_closed_candle["stoch_rsi_k"] < last_closed_candle["stoch_rsi_d"] and last_closed_candle["stoch_rsi_k"] > 80
+        and last_closed_candle["macd"] < last_closed_candle["macd_signal"]
+    ):
+        stop_loss = last_closed_candle["close"] + (1.5 * last_closed_candle["atr"])
+        return "SHORT", last_closed_candle["close"], stop_loss
+
+    return None, None, None

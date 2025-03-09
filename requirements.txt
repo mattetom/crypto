@@ -6,3 +6,5 @@ azure-functions
 pandas
 numpy
 azure-storage-blob
+ta
+requests
