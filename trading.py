@@ -6,12 +6,17 @@ import requests
 import uuid
 import os
 from utils import get_timestamp, sign, pre_hash, parse_params_to_str, generate_rest_signature
+from datetime import datetime
+from azure.data.tables import TableServiceClient, TableClient, UpdateMode
+from azure.core.exceptions import ResourceExistsError
 
 # Get settings from environment variables
 API_KEY = os.environ.get("API_KEY")
 API_SECRET = os.environ.get("API_SECRET")
 API_PASSPHRASE = os.environ.get("API_PASSPHRASE")
 BITGET_API_URL = os.environ.get("BITGET_API_URL", "https://api.bitget.com")
+AZURE_STORAGE_CONNECTION_STRING = os.environ.get("AzureWebJobsStorage")
+TRADING_SIGNALS_TABLE_NAME = os.environ.get("TRADING_SIGNALS_TABLE_NAME", "TradingSignals")
 
 def get_futures_open_positions():
     logging.info("Fetching futures open positions")
@@ -456,40 +461,102 @@ def calculate_indicators(df):
     """Calcola MACD, Stochastic RSI e ATR"""
     df["close"] = df["close"].astype(float)
 
-    # MACD (7,14,5)
-    macd = ta.trend.MACD(df["close"], window_slow=14, window_fast=7, window_sign=5)
+    # MACD (5,12,4) - più veloce
+    macd = ta.trend.MACD(df["close"], window_slow=12, window_fast=5, window_sign=4)
     df["macd"] = macd.macd()
     df["macd_signal"] = macd.macd_signal()
 
-    # Stochastic RSI (7,3,3)
-    stoch_rsi = ta.momentum.StochRSIIndicator(df["close"], window=7, smooth1=3, smooth2=3)
+    # Stochastic RSI (6,2,2) - più reattivo
+    stoch_rsi = ta.momentum.StochRSIIndicator(df["close"], window=6, smooth1=2, smooth2=2)
     df["stoch_rsi_k"] = stoch_rsi.stochrsi_k()
     df["stoch_rsi_d"] = stoch_rsi.stochrsi_d()
 
-    # ATR (7)
+    # ATR (7) + Calcolo crescita percentuale
     atr = ta.volatility.AverageTrueRange(df["high"], df["low"], df["close"], window=7)
     df["atr"] = atr.average_true_range()
+    df["atr_growth"] = df["atr"].pct_change()  # Percentuale di crescita dell'ATR
+
+    # EMA 9 - Filtro direzione trend
+    df["ema9"] = ta.trend.ema_indicator(df["close"], window=9)
 
     return df
 
 # Funzione per determinare segnali di trading
-def check_trade_signal(df):
+def check_trade_signal(df, symbol, interval):
     """Usa solo la penultima candela chiusa per evitare falsi segnali"""
     last_closed_candle = df.iloc[-2]  # Usa la penultima candela chiusa
-    prev_candle = df.iloc[-3]  # Ancora una più vecchia per confronto
+
+    # Create a dictionary to store the signal data
+    signal_data = {
+        "PartitionKey": symbol,
+        "RowKey": f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}",
+        "Timestamp": datetime.utcnow().isoformat(),
+        "Symbol": symbol,
+        "Interval": interval,
+        "StochRSI_K": float(last_closed_candle["stoch_rsi_k"]),
+        "StochRSI_D": float(last_closed_candle["stoch_rsi_d"]),
+        "MACD": float(last_closed_candle["macd"]),
+        "MACD_Signal": float(last_closed_candle["macd_signal"]),
+        "Close": float(last_closed_candle["close"]),
+        "ATR": float(last_closed_candle["atr"]),
+        "ATR_GROWTH": float(last_closed_candle["atr_growth"]),
+        "EMA9": float(last_closed_candle["ema9"]),
+        "Decision": "NONE",
+        "StopLoss": None
+    }
 
     if (
-        last_closed_candle["stoch_rsi_k"] > last_closed_candle["stoch_rsi_d"] and last_closed_candle["stoch_rsi_k"] < 20
+        last_closed_candle["stoch_rsi_k"] > last_closed_candle["stoch_rsi_d"] and last_closed_candle["stoch_rsi_k"] < 0.2
         and last_closed_candle["macd"] > last_closed_candle["macd_signal"]
     ):
         stop_loss = last_closed_candle["close"] - (1.5 * last_closed_candle["atr"])
+        signal_data["Decision"] = "LONG"
+        signal_data["StopLoss"] = float(stop_loss)
+        
+        # Save data to Azure Table Storage
+        save_signal_to_azure(signal_data)
+        
         return "LONG", last_closed_candle["close"], stop_loss
 
     elif (
-        last_closed_candle["stoch_rsi_k"] < last_closed_candle["stoch_rsi_d"] and last_closed_candle["stoch_rsi_k"] > 80
+        last_closed_candle["stoch_rsi_k"] < last_closed_candle["stoch_rsi_d"] and last_closed_candle["stoch_rsi_k"] > 0.8
         and last_closed_candle["macd"] < last_closed_candle["macd_signal"]
     ):
         stop_loss = last_closed_candle["close"] + (1.5 * last_closed_candle["atr"])
+        signal_data["Decision"] = "SHORT"
+        signal_data["StopLoss"] = float(stop_loss)
+        
+        # Save data to Azure Table Storage
+        save_signal_to_azure(signal_data)
+        
         return "SHORT", last_closed_candle["close"], stop_loss
 
+    # Save the NONE decision data too
+    save_signal_to_azure(signal_data)
+    
     return None, None, None
+
+def save_signal_to_azure(signal_data):
+    """Save trading signal data to Azure Table Storage"""
+    if not AZURE_STORAGE_CONNECTION_STRING:
+        logging.warning("Azure Storage connection string not found. Signal data will not be saved.")
+        return
+    
+    try:
+        # Create the table client
+        table_client = TableClient.from_connection_string(
+            conn_str=AZURE_STORAGE_CONNECTION_STRING, 
+            table_name=TRADING_SIGNALS_TABLE_NAME
+        )
+        
+        # Create table if it doesn't exist
+        try:
+            table_client.create_table()
+        except ResourceExistsError:
+            pass  # Table already exists
+            
+        # Add the entity to the table
+        table_client.create_entity(entity=signal_data)
+        logging.info(f"Successfully saved trading signal for {signal_data['Symbol']} to Azure Table Storage")
+    except Exception as e:
+        logging.error(f"Failed to save trading signal to Azure Table Storage: {e}")

@@ -6,5 +6,6 @@ azure-functions
 pandas
 numpy
 azure-storage-blob
+azure-data-tables
 ta
 requests

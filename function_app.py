@@ -154,8 +154,8 @@ def calculate_strategyv2(myTimer: func.TimerRequest) -> None:
         df_5m = calculate_indicators(df_5m)
         df_1m = calculate_indicators(df_1m)
         
-        signal_5m, entry_price_5m, stop_loss_5m = check_trade_signal(df_5m)
-        signal_1m, entry_price_1m, stop_loss_1m = check_trade_signal(df_1m)
+        signal_5m, entry_price_5m, stop_loss_5m = check_trade_signal(df_5m, symbol=SYMBOL, interval="5m")
+        signal_1m, entry_price_1m, stop_loss_1m = check_trade_signal(df_1m, symbol=SYMBOL, interval="1m")
         
         if signal_5m == signal_1m and signal_5m is not None:
             logging.info(f"📢 {signal_5m} ENTRY confirmed at {entry_price_5m:.4f} USDT")
