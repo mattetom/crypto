@@ -483,9 +483,9 @@ def calculate_indicators(df):
 
 # Funzione per determinare segnali di trading
 def check_trade_signal(df, symbol, interval):
-    """Usa solo la penultima candela chiusa per evitare falsi segnali"""
+    """Usa la penultima e la terzultima candela chiusa per evitare falsi segnali"""
     last_closed_candle = df.iloc[-2]  # Usa la penultima candela chiusa
-
+    previous_closed_candle = df.iloc[-3]  # Usa la terzultima candela chiusa
     # Create a dictionary to store the signal data
     signal_data = {
         "PartitionKey": symbol,
@@ -506,7 +506,7 @@ def check_trade_signal(df, symbol, interval):
     }
 
     if (
-        last_closed_candle["stoch_rsi_k"] > last_closed_candle["stoch_rsi_d"] and last_closed_candle["stoch_rsi_k"] < 0.2
+        last_closed_candle["stoch_rsi_k"] > last_closed_candle["stoch_rsi_d"] and previous_closed_candle["stoch_rsi_k"] < 0.2
         and last_closed_candle["macd"] > last_closed_candle["macd_signal"]
     ):
         stop_loss = last_closed_candle["close"] - (1.5 * last_closed_candle["atr"])
@@ -519,7 +519,7 @@ def check_trade_signal(df, symbol, interval):
         return "LONG", last_closed_candle["close"], stop_loss
 
     elif (
-        last_closed_candle["stoch_rsi_k"] < last_closed_candle["stoch_rsi_d"] and last_closed_candle["stoch_rsi_k"] > 0.8
+        last_closed_candle["stoch_rsi_k"] < last_closed_candle["stoch_rsi_d"] and previous_closed_candle["stoch_rsi_k"] > 0.8
         and last_closed_candle["macd"] < last_closed_candle["macd_signal"]
     ):
         stop_loss = last_closed_candle["close"] + (1.5 * last_closed_candle["atr"])
