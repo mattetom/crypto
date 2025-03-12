@@ -536,6 +536,60 @@ def check_trade_signal(df, symbol, interval):
     
     return None, None, None
 
+# Funzione per determinare segnali di trading
+def confirm_trade_signal(df, symbol, interval):
+    """Usa la penultima e la terzultima candela chiusa per evitare falsi segnali"""
+    last_closed_candle = df.iloc[-2]  # Usa la penultima candela chiusa
+    previous_closed_candle = df.iloc[-3]  # Usa la terzultima candela chiusa
+    # Create a dictionary to store the signal data
+    signal_data = {
+        "PartitionKey": symbol,
+        "RowKey": f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}",
+        "Timestamp": datetime.utcnow().isoformat(),
+        "Symbol": symbol,
+        "Interval": interval,
+        "StochRSI_K": float(last_closed_candle["stoch_rsi_k"]),
+        "StochRSI_D": float(last_closed_candle["stoch_rsi_d"]),
+        "MACD": float(last_closed_candle["macd"]),
+        "MACD_Signal": float(last_closed_candle["macd_signal"]),
+        "Close": float(last_closed_candle["close"]),
+        "ATR": float(last_closed_candle["atr"]),
+        "ATR_GROWTH": float(last_closed_candle["atr_growth"]),
+        "EMA9": float(last_closed_candle["ema9"]),
+        "Decision": "NONE",
+        "StopLoss": None
+    }
+
+    if (
+        last_closed_candle["macd"] > last_closed_candle["macd_signal"]
+    ):
+        stop_loss = last_closed_candle["close"] - (1.5 * last_closed_candle["atr"])
+        signal_data["Decision"] = "LONG"
+        signal_data["StopLoss"] = float(stop_loss)
+        
+        # Save data to Azure Table Storage
+        save_signal_to_azure(signal_data)
+        
+        return "LONG", last_closed_candle["close"], stop_loss
+
+    elif (
+        last_closed_candle["macd"] < last_closed_candle["macd_signal"]
+    ):
+        stop_loss = last_closed_candle["close"] + (1.5 * last_closed_candle["atr"])
+        signal_data["Decision"] = "SHORT"
+        signal_data["StopLoss"] = float(stop_loss)
+        
+        # Save data to Azure Table Storage
+        save_signal_to_azure(signal_data)
+        
+        return "SHORT", last_closed_candle["close"], stop_loss
+
+    # Save the NONE decision data too
+    save_signal_to_azure(signal_data)
+    
+    return None, None, None
+
+
 def save_signal_to_azure(signal_data):
     """Save trading signal data to Azure Table Storage"""
     if not AZURE_STORAGE_CONNECTION_STRING:
