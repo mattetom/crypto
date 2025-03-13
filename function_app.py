@@ -142,7 +142,7 @@ def calculate_macd(myTimer: func.TimerRequest) -> None:
     except Exception as e:
         logging.error(f"Error calculating MACD: {e}")
 
-@app.timer_trigger(schedule="0 */1 * * * *", arg_name="myTimer", run_on_startup=False,
+@app.timer_trigger(schedule="10 */1 * * * *", arg_name="myTimer", run_on_startup=False,
               use_monitor=False) 
 def calculate_strategyv2(myTimer: func.TimerRequest) -> None:
     logging.info("Azure Function TradeBot avviato.")

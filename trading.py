@@ -484,6 +484,8 @@ def calculate_indicators(df):
 # Funzione per determinare segnali di trading
 def check_trade_signal(df, symbol, interval):
     """Usa la penultima e la terzultima candela chiusa per evitare falsi segnali"""
+    last_candle = df.iloc[0]  # Usa l'ultima candela
+    current_candle = df.iloc[-1]  # Usa l'ultima candela chiusa
     last_closed_candle = df.iloc[-2]  # Usa la penultima candela chiusa
     previous_closed_candle = df.iloc[-3]  # Usa la terzultima candela chiusa
     # Create a dictionary to store the signal data
