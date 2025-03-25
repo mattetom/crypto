@@ -143,8 +143,9 @@ def calculate_macd(myTimer: func.TimerRequest) -> None:
         logging.error(f"Error calculating MACD: {e}")
 
 @app.timer_trigger(schedule="10 */1 * * * *", arg_name="myTimer", run_on_startup=False,
-              use_monitor=False) 
+              use_monitor=False, disabled=True) 
 def calculate_strategyv2(myTimer: func.TimerRequest) -> None:
+    return  # Early return to prevent execution
     logging.info("Azure Function TradeBot avviato.")
     SYMBOL = "WIFUSDT"
     df_5m = get_candles(SYMBOL, "5m", limit=100)
@@ -175,7 +176,7 @@ def open_long(req: func.HttpRequest) -> func.HttpResponse:
 
         logging.info('open_long function called with symbol: %s', symbol) 
         # Open a future long position at market value
-        order_response = place_market_order(symbol, size=10, side="buy")
+        order_response = place_market_order(symbol, size=5, side="buy", SL=0.4, TPArray=[0.001, 0.015, 0.02, 0.025], CallbackArray=[4, 1.5, 1, 0.5])
         
         if order_response is None:
             return func.HttpResponse(json.dumps({"message": "No order was executed or position already exists"}), 
@@ -199,7 +200,7 @@ def open_short(req: func.HttpRequest) -> func.HttpResponse:
 
         logging.info('open_short function called with symbol: %s', symbol) 
         # Open a future short position at market value
-        order_response = place_market_order(symbol, size=10, side="sell")
+        order_response = place_market_order(symbol, size=5, side="sell", SL=0.4, TPArray=[0.001, 0.015, 0.02, 0.025], CallbackArray=[4, 1.5, 1, 0.5])
         
         if order_response is None:
             return func.HttpResponse(json.dumps({"message": "No order was executed or position already exists"}), 

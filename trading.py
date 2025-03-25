@@ -101,7 +101,7 @@ def reverse_position(symbol, size, side):
     response = requests.post(BITGET_API_URL + endpoint, headers=headers, json=order_data)
     return response.json()
 
-def place_trailing_stop_order(symbol, size, side, trigger_price, client_oid):
+def place_trailing_stop_order(symbol, size, side, trigger_price, callback, client_oid):
     """Places a trailing stop order using Bitget V2 API."""
     logging.info(f"Placing trailing stop order for symbol: {symbol}, size: {size}, side: {side}, trigger_price: {trigger_price}")
 
@@ -114,13 +114,13 @@ def place_trailing_stop_order(symbol, size, side, trigger_price, client_oid):
         "marginMode": "isolated",
         "marginCoin": "USDT",
         "size": size,
-        "callbackRatio": 1,
+        "callbackRatio": callback,
         "triggerPrice": trigger_price,
         "triggerType": "mark_price",
         "side": side,
         "tradeSide": "close",
         "orderType": "market",
-        "clientOid": client_oid + "_ts",
+        "clientOid": client_oid + "_" + trigger_price + "_ts",
         "reduceOnly": "yes",
         "stpMode": "cancel_both"
     }
@@ -191,7 +191,7 @@ def place_stop_loss_order(symbol, size, side, stop_price, client_oid):
         "stopLossTriggerPrice": stop_price,
         "stopLossTriggerType": "mark_price",
         "stpMode": "cancel_both",
-        "clientOid": client_oid + "_sl",
+        "clientOid": client_oid + "_" + stop_price + "_" + "_sl",
         "reduceOnly": "yes"
     }
 
@@ -291,7 +291,7 @@ def cancel_orders(symbol, order_ids):
     t = response.json()
     return t
 
-def place_market_order(symbol, size, side):
+def place_market_order(symbol, size, side, SL, TPArray, CallbackArray):
     """Places a market order using Bitget V2 API and places a trailing stop order and stop loss order."""
     logging.info(f"Placing market order for symbol: {symbol}, size: {size}, side: {side}")
 
@@ -307,27 +307,29 @@ def place_market_order(symbol, size, side):
     # Check if there is an open position for the symbol
     position = get_futures_open_position(symbol)
     if position.get("data"):
-        logging.info(f"Position already open for symbol: {symbol} - Reversing position")
-        position_data = position["data"][0]
-        position_direction = position_data["holdSide"]
-        if ((position_direction == 'long' and side == 'buy') or (position_direction == 'short' and side == 'sell')):
-            logging.info(f"Position already open for symbol: {symbol} and side: {position_direction}")
-            return None
-        position_size = float(position_data["available"])
-        position_side = position_data["holdSide"]
-        # get all open orders related to the symbol and cancel them
-        order_ids = []
-        logging.info(f"Canceling all open orders for symbol: {symbol}")
-        open_orders = get_open_orders(symbol, "normal_plan")
-        if open_orders.get("data") and open_orders["data"]["entrustedList"]:
-            order_ids = [order["orderId"] for order in open_orders["data"]["entrustedList"]]
-        open_orders = get_open_orders(symbol, "track_plan")
-        if open_orders.get("data") and open_orders["data"]["entrustedList"]:
-            order_ids += [order["orderId"] for order in open_orders["data"]["entrustedList"]]
-        if order_ids:
-            cancel_orders(symbol, order_ids)
-        order_response = reverse_position(symbol, position_size, "sell" if position_side == "short" else "buy")
-        logging.info(f"Reversed position response: {order_response}")
+        # logging.info(f"Position already open for symbol: {symbol} - Reversing position")
+        # position_data = position["data"][0]
+        # position_direction = position_data["holdSide"]
+        # if ((position_direction == 'long' and side == 'buy') or (position_direction == 'short' and side == 'sell')):
+        #     logging.info(f"Position already open for symbol: {symbol} and side: {position_direction}")
+        #     return None
+        # position_size = float(position_data["available"])
+        # position_side = position_data["holdSide"]
+        # # get all open orders related to the symbol and cancel them
+        # order_ids = []
+        # logging.info(f"Canceling all open orders for symbol: {symbol}")
+        # open_orders = get_open_orders(symbol, "normal_plan")
+        # if open_orders.get("data") and open_orders["data"]["entrustedList"]:
+        #     order_ids = [order["orderId"] for order in open_orders["data"]["entrustedList"]]
+        # open_orders = get_open_orders(symbol, "track_plan")
+        # if open_orders.get("data") and open_orders["data"]["entrustedList"]:
+        #     order_ids += [order["orderId"] for order in open_orders["data"]["entrustedList"]]
+        # if order_ids:
+        #     cancel_orders(symbol, order_ids)
+        # order_response = reverse_position(symbol, position_size, "sell" if position_side == "short" else "buy")
+        # logging.info(f"Reversed position response: {order_response}")
+        logging.info(f"Position already open for symbol: {symbol}")
+        return None
     else:
         logging.info(f"No open position for symbol: {symbol}")
         # cancel all open orders for the symbol
@@ -377,12 +379,14 @@ def place_market_order(symbol, size, side):
        if order_details.get("data"):
             order_price = float(order_details["data"]["priceAvg"])
             size = float(order_details["data"]["size"])
-            trigger_price = round(order_price * 1.02 if side == "buy" else order_price * 0.98, price_precision)
-            stop_loss_price = round(order_price * 0.985 if side == "buy" else order_price * 1.015, price_precision)
-            trailing_stop_side = "sell" if side == "sell" else "buy"
+            stop_loss_price = round(order_price * (1- SL) if side == "buy" else order_price * (1+SL), price_precision)
             stop_loss_side = "sell" if side == "sell" else "buy"
-            place_trailing_stop_order(symbol, size, trailing_stop_side, trigger_price, client_oid_prefix)
             place_stop_loss_order(symbol, size, stop_loss_side, stop_loss_price, client_oid_prefix)
+            for TP in TPArray:
+                trigger_price = round(order_price * (1+TPArray[TP]) if side == "buy" else order_price * (1-TPArray[TP]), price_precision)
+                callback = CallbackArray[TP]
+                trailing_stop_side = "sell" if side == "sell" else "buy"
+                place_trailing_stop_order(symbol, size, trailing_stop_side, trigger_price, callback, client_oid_prefix)
             #modify_market_order(symbol, order_id, stop_loss_price)
     return order_details
 
