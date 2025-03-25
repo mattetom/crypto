@@ -120,7 +120,7 @@ def place_trailing_stop_order(symbol, size, side, trigger_price, callback, clien
         "side": side,
         "tradeSide": "close",
         "orderType": "market",
-        "clientOid": client_oid + "_" + trigger_price + "_ts",
+        #"clientOid": client_oid + "_ts",
         "reduceOnly": "yes",
         "stpMode": "cancel_both"
     }
@@ -191,7 +191,7 @@ def place_stop_loss_order(symbol, size, side, stop_price, client_oid):
         "stopLossTriggerPrice": stop_price,
         "stopLossTriggerType": "mark_price",
         "stpMode": "cancel_both",
-        "clientOid": client_oid + "_" + stop_price + "_" + "_sl",
+        "clientOid": client_oid + "_sl",
         "reduceOnly": "yes"
     }
 
@@ -294,6 +294,7 @@ def cancel_orders(symbol, order_ids):
 def place_market_order(symbol, size, side, SL, TPArray, CallbackArray):
     """Places a market order using Bitget V2 API and places a trailing stop order and stop loss order."""
     logging.info(f"Placing market order for symbol: {symbol}, size: {size}, side: {side}")
+    order_details = None
 
     symbol_info = get_symbol_precision(symbol)
     if not symbol_info:
@@ -344,6 +345,26 @@ def place_market_order(symbol, size, side, SL, TPArray, CallbackArray):
         if order_ids:
             cancel_orders(symbol, order_ids)
         
+        # getcurrent price
+        timestamp = get_timestamp()
+        endpoint = "/api/v2/mix/market/ticker"
+        params = {"symbol": symbol, "productType": "USDT-FUTURES"}
+        request_path = endpoint + parse_params_to_str(params)
+        signature = sign(pre_hash(timestamp, "GET", request_path, str("")), API_SECRET)
+        headers = {
+            "ACCESS-KEY": API_KEY,
+            "ACCESS-SIGN": signature,
+            "ACCESS-TIMESTAMP": str(timestamp),
+            "ACCESS-PASSPHRASE": API_PASSPHRASE,
+            "locale": "en-US",
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(BITGET_API_URL + request_path, headers=headers)
+        respJson = response.json()
+        current_price = respJson["data"][0]["markPrice"]
+        symbol_size = round(size / float(current_price), size_precision)
+
         endpoint = "/api/v2/mix/order/place-order"
     
         order_data = {
@@ -351,7 +372,7 @@ def place_market_order(symbol, size, side, SL, TPArray, CallbackArray):
             "productType": "USDT-FUTURES",
             "marginMode": "isolated",
             "marginCoin": "USDT",
-            "size": size,
+            "size": symbol_size,
             "side": side,
             "tradeSide": "open",
             "orderType": "market",
@@ -383,8 +404,8 @@ def place_market_order(symbol, size, side, SL, TPArray, CallbackArray):
             stop_loss_side = "sell" if side == "sell" else "buy"
             place_stop_loss_order(symbol, size, stop_loss_side, stop_loss_price, client_oid_prefix)
             for TP in TPArray:
-                trigger_price = round(order_price * (1+TPArray[TP]) if side == "buy" else order_price * (1-TPArray[TP]), price_precision)
-                callback = CallbackArray[TP]
+                trigger_price = round(order_price * (1+TP) if side == "buy" else order_price * (1-TP), price_precision)
+                callback = CallbackArray[TPArray.index(TP)]
                 trailing_stop_side = "sell" if side == "sell" else "buy"
                 place_trailing_stop_order(symbol, size, trailing_stop_side, trigger_price, callback, client_oid_prefix)
             #modify_market_order(symbol, order_id, stop_loss_price)
