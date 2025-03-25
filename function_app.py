@@ -165,6 +165,7 @@ def calculate_strategyv2(myTimer: func.TimerRequest) -> None:
             logging.info(f"🔹 Stop Loss at {stop_loss_5m:.4f} USDT")
             send_email(f"📢 {signal_5m} ENTRY confirmed at {entry_price_5m:.4f} USDT",f"Set Stop Loss at {stop_loss_5m:.4f} USDT", "matteo.tomasini@gmail.com")
 
+@app.function_name("open_long")
 @app.route(route="open_long", auth_level=func.AuthLevel.ANONYMOUS)
 def open_long(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
@@ -188,7 +189,7 @@ def open_long(req: func.HttpRequest) -> func.HttpResponse:
         logging.error(f"Error processing request: {e}")
         return func.HttpResponse("Internal Server Error", status_code=500)
 
-
+@app.function_name("open_short")
 @app.route(route="open_short", auth_level=func.AuthLevel.ANONYMOUS)
 def open_short(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
