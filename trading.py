@@ -291,9 +291,17 @@ def cancel_orders(symbol, order_ids):
     t = response.json()
     return t
 
-def place_market_order(symbol, size, side, SL, TPArray, CallbackArray):
+# Opens a market order and places a trailing stop order and a stop loss order
+# SL is the stop loss percentage
+# TSArray is an array of percentages to calculate the trailing stop values
+# callbackArray is an array of callbacks for the trailing stop
+# size_ratio_array is an array of percentages to calculate the size quantity for the trailing stop.
+#   1 means placing the order for the same quantity as the main order,
+#   other allowed values are less than 1 and are to be multiplied by the main order quantity
+#       to obtain the trailing stop order quantity that I want to keep safe for a non-loss closure
+def place_market_order(symbol, order_symbol_size, side, SL, TSArray, callbackArray, size_ratio_array):
     """Places a market order using Bitget V2 API and places a trailing stop order and stop loss order."""
-    logging.info(f"Placing market order for symbol: {symbol}, size: {size}, side: {side}")
+    logging.info(f"Placing market order for symbol: {symbol}, size: {order_symbol_size}, side: {side}")
     order_details = None
 
     symbol_info = get_symbol_precision(symbol)
@@ -363,7 +371,7 @@ def place_market_order(symbol, size, side, SL, TPArray, CallbackArray):
         response = requests.get(BITGET_API_URL + request_path, headers=headers)
         respJson = response.json()
         current_price = respJson["data"][0]["markPrice"]
-        symbol_size = round(size / float(current_price), size_precision)
+        symbol_size = round(order_symbol_size / float(current_price), size_precision)
 
         endpoint = "/api/v2/mix/order/place-order"
     
@@ -399,15 +407,16 @@ def place_market_order(symbol, size, side, SL, TPArray, CallbackArray):
        order_details = get_order_details(symbol, order_id)
        if order_details.get("data"):
             order_price = float(order_details["data"]["priceAvg"])
-            size = float(order_details["data"]["size"])
+            order_symbol_size = float(order_details["data"]["size"])
             stop_loss_price = round(order_price * (1- SL) if side == "buy" else order_price * (1+SL), price_precision)
             stop_loss_side = "sell" if side == "sell" else "buy"
-            place_stop_loss_order(symbol, size, stop_loss_side, stop_loss_price, client_oid_prefix)
-            for TP in TPArray:
+            place_stop_loss_order(symbol, order_symbol_size, stop_loss_side, stop_loss_price, client_oid_prefix)
+            for TP in TSArray:
                 trigger_price = round(order_price * (1+TP) if side == "buy" else order_price * (1-TP), price_precision)
-                callback = CallbackArray[TPArray.index(TP)]
+                callback = callbackArray[TSArray.index(TP)]
                 trailing_stop_side = "sell" if side == "sell" else "buy"
-                place_trailing_stop_order(symbol, size, trailing_stop_side, trigger_price, callback, client_oid_prefix)
+                TSsafeSize = order_symbol_size * size_ratio_array[TSArray.index(TP)]
+                place_trailing_stop_order(symbol, TSsafeSize, trailing_stop_side, trigger_price, callback, client_oid_prefix)
             #modify_market_order(symbol, order_id, stop_loss_price)
     return order_details
 

@@ -110,14 +110,14 @@ def calculate_macd(myTimer: func.TimerRequest) -> None:
                     if signal_type == "BULLISH" and last_bullish_action_time is None:
                         # Open a long position
                         logging.info(f"Opening LONG position for {symbol} based on MACD signal")
-                        order_response = place_market_order(symbol, size=10, side="buy")
+                        order_response = place_market_order(symbol, order_symbol_size=10, side="buy")
                         if order_response:
                             last_bullish_action_time = current_time
                             
                     elif signal_type == "BEARISH" and last_bearish_action_time is None:
                         # Open a short position
                         logging.info(f"Opening SHORT position for {symbol} based on MACD signal")
-                        order_response = place_market_order(symbol, size=10, side="sell")
+                        order_response = place_market_order(symbol, order_symbol_size=10, side="sell")
                         if order_response:
                             last_bearish_action_time = current_time
             else:
@@ -177,7 +177,7 @@ def open_long(req: func.HttpRequest) -> func.HttpResponse:
 
         logging.info('open_long function called with symbol: %s', symbol) 
         # Open a future long position at market value
-        order_response = place_market_order(symbol, size=20, side="buy", SL=0.4, TPArray=[0.001, 0.015, 0.02, 0.025], CallbackArray=[4, 1.5, 1, 0.5])
+        order_response = place_market_order(symbol, order_symbol_size=20, side="buy", SL=0.4, TSArray=[0.001, 0.015, 0.02, 0.025], callbackArray=[4, 1.5, 1, 0.5], size_ratio_array=[1, 0.75, 0.85, 0.95])
         
         if order_response is None:
             return func.HttpResponse(json.dumps({"message": "No order was executed or position already exists"}), 
@@ -201,7 +201,7 @@ def open_short(req: func.HttpRequest) -> func.HttpResponse:
 
         logging.info('open_short function called with symbol: %s', symbol) 
         # Open a future short position at market value
-        order_response = place_market_order(symbol, size=20, side="sell", SL=0.04, TPArray=[0.001, 0.015, 0.02, 0.025], CallbackArray=[4, 1.5, 1, 0.5])
+        order_response = place_market_order(symbol, order_symbol_size=20, side="sell", SL=0.04, TSArray=[0.001, 0.015, 0.02, 0.025], callbackArray=[4, 1.5, 1, 0.5], size_ratio_array=[1, 0.75, 0.85, 0.95])
         
         if order_response is None:
             return func.HttpResponse(json.dumps({"message": "No order was executed or position already exists"}), 
