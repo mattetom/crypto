@@ -415,7 +415,7 @@ def place_market_order(symbol, order_symbol_size, side, SL, TSArray, callbackArr
                 trigger_price = round(order_price * (1+TP) if side == "buy" else order_price * (1-TP), price_precision)
                 callback = callbackArray[TSArray.index(TP)]
                 trailing_stop_side = "sell" if side == "sell" else "buy"
-                TSsafeSize = order_symbol_size * size_ratio_array[TSArray.index(TP)]
+                TSsafeSize = round(order_symbol_size * size_ratio_array[TSArray.index(TP)], size_precision)
                 place_trailing_stop_order(symbol, TSsafeSize, trailing_stop_side, trigger_price, callback, client_oid_prefix)
             #modify_market_order(symbol, order_id, stop_loss_price)
     return order_details
