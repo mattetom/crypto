@@ -177,7 +177,7 @@ def open_long(req: func.HttpRequest) -> func.HttpResponse:
 
         logging.info('open_long function called with symbol: %s', symbol) 
         # Open a future long position at market value
-        order_response = place_market_order(symbol, order_symbol_size=200, side="buy", SL=0.04, TSArray=[0.001, 0.015, 0.02, 0.025], callbackArray=[4, 1.5, 1, 0.5], size_ratio_array=[1, 0.75, 0.85, 0.95])
+        order_response = place_market_order(symbol, order_symbol_size=200, side="buy", SL=0.03, TSArray=[0.001, 0.015, 0.02, 0.025], callbackArray=[3, 1.5, 1, 0.5], size_ratio_array=[1, 0.75, 0.85, 0.95])
         
         if order_response is None:
             return func.HttpResponse(json.dumps({"message": "No order was executed or position already exists"}), 
@@ -201,7 +201,7 @@ def open_short(req: func.HttpRequest) -> func.HttpResponse:
 
         logging.info('open_short function called with symbol: %s', symbol) 
         # Open a future short position at market value
-        order_response = place_market_order(symbol, order_symbol_size=200, side="sell", SL=0.04, TSArray=[0.001, 0.015, 0.02, 0.025], callbackArray=[4, 1.5, 1, 0.5], size_ratio_array=[1, 0.75, 0.85, 0.95])
+        order_response = place_market_order(symbol, order_symbol_size=200, side="sell", SL=0.03, TSArray=[0.001, 0.015, 0.02, 0.025], callbackArray=[3, 1.5, 1, 0.5], size_ratio_array=[1, 0.75, 0.85, 0.95])
         
         if order_response is None:
             return func.HttpResponse(json.dumps({"message": "No order was executed or position already exists"}), 
