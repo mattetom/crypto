@@ -31,6 +31,7 @@ def build_prompt(
     prompt = f"""
 Simbolo: {symbol}
 Analizza attentamente i dati su più timeframe (1h, 15m, 5m) e suggerisci se aprire una posizione long, short o attendere.
+Voglio fare un trading piuttosto aggressivo sfruttando anche le oscillazioni di breve termine.
 Se non è il momento di agire, indica tra quanti minuti rivalutare la situazione e restituisci 0 come take profit e stop loss.
 Se è il momento di agire, suggerisci una percentuale di take profit e stop loss.
 Restituisci un JSON con 5 campi:
