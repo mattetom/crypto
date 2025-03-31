@@ -12,7 +12,7 @@ def build_prompt(
     indicators_5m: Dict
 ) -> str:
 
-    def format_candles(candles: List, label: str, limit: int = 5) -> str:
+    def format_candles(candles: List, label: str, limit: int = 15) -> str:
         output = f"\n {label} - ultime {limit} candele:\n"
         for i, c in enumerate(candles[-limit:]):
             output += f"{i+1}) open: {c[1]}, high: {c[2]}, low: {c[3]}, close: {c[4]}, volume: {c[5]}\n"
@@ -30,9 +30,7 @@ def build_prompt(
 
     prompt = f"""
 Simbolo: {symbol}
-Sei un esperto di trading di cryptovalute.
-Analizza attentamente i dati su più timeframe (4h, 1h, 15m, 5m) e suggerisci se aprire una posizione long, short o attendere.
-Considera di aprire una posizione solo se prevedi un movimento con un possibile guadagno di almeno 1%
+Analizza attentamente i dati su più timeframe (1h, 15m, 5m) e suggerisci se aprire una posizione long, short o attendere.
 Se non è il momento di agire, indica tra quanti minuti rivalutare la situazione e restituisci 0 come take profit e stop loss.
 Se è il momento di agire, suggerisci una percentuale di take profit e stop loss.
 Restituisci un JSON con 5 campi:
@@ -42,9 +40,6 @@ Restituisci un JSON con 5 campi:
 - take_profit_pct: float (percentuale suggerita per TP, es. 1.5 = 1.5%)
 - stop_loss_pct: float (percentuale suggerita per SL, es. 0.8 = 0.8%)
 Non usare mai più di 100 token per la spiegazione.
-
-{format_candles(candles_4h, "Timeframe 4h")}
-{format_indicators("4h", indicators_4h)}
 
 {format_candles(candles_1h, "Timeframe 1h")}
 {format_indicators("1h", indicators_1h)}

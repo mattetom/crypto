@@ -39,7 +39,6 @@ def call_openai_market_analysis(prompt: str) -> Dict:
         "format": {
             "type": "json_schema",
             "name": "analyze_market",
-            "description": "Analizza i dati di mercato e suggerisce l'azione da eventualmente compiere e tra quanti minuti rieseguire l'analisi per capire se è il momento di entrare in posizione, e i livelli di TP/SL.",
             "schema": {
                 "type": "object",
                 "properties": {
@@ -54,12 +53,10 @@ def call_openai_market_analysis(prompt: str) -> Dict:
                         "type": "string"
                     },
                     "take_profit_pct": {
-                        "type": "number",
-                        "description": "Percentuale suggerita per TP (es. 1.5 = 1.5%)"
+                        "type": "number"
                     },
                     "stop_loss_pct": {
-                        "type": "number",
-                        "description": "Percentuale suggerita per SL (es. 0.8 = 0.8%)"
+                        "type": "number"
                     }
                 },
                 "required": ["action", "next_check_minutes", "reason", "take_profit_pct", "stop_loss_pct"],

@@ -21,7 +21,7 @@ def should_call_openai(status: dict) -> bool:
 app = func.FunctionApp()
 
 @app.function_name(name="takeDecsion")
-@app.timer_trigger(schedule="10 */1 * * * *", arg_name="myTimer", run_on_startup=True,
+@app.timer_trigger(schedule="10 */1 * * * *", arg_name="myTimer", run_on_startup=False,
               use_monitor=False) 
 def takeDecsion(myTimer: func.TimerRequest) -> None:
     if myTimer.past_due:
