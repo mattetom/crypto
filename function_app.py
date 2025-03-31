@@ -40,11 +40,13 @@ def takeDecsion(myTimer: func.TimerRequest) -> None:
         candles_1h = get_candles(SYMBOL, "1H", 50)
         candles_15m = get_candles(SYMBOL, "15m", 50)
         candles_5m = get_candles(SYMBOL, "5m", 50)
+        candles_1m = get_candles(SYMBOL, "1m", 50)
 
         ind_4h = compute_indicators(candles_4h)
         ind_1h = compute_indicators(candles_1h)
         ind_15m = compute_indicators(candles_15m)
         ind_5m = compute_indicators(candles_5m)
+        ind_1m = compute_indicators(candles_1m)
 
         prompt = build_prompt(
             symbol=SYMBOL,
@@ -52,10 +54,12 @@ def takeDecsion(myTimer: func.TimerRequest) -> None:
             candles_1h=candles_1h,
             candles_15m=candles_15m,
             candles_5m=candles_5m,
+            candles_1m=candles_1m,
             indicators_4h=ind_4h,
             indicators_1h=ind_1h,
             indicators_15m=ind_15m,
             indicators_5m=ind_5m,
+            indicators_1m=ind_1m
         )
 
         result = call_openai_market_analysis(prompt)

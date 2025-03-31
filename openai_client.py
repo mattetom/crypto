@@ -6,33 +6,10 @@ from typing import Dict
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-function_schema = {
-    "name": "analyze_market",
-    "description": "Analizza i dati di mercato e suggerisce l'azione da compiere e quando rieseguire l'analisi",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "action": {
-                "type": "string",
-                "enum": ["buy", "sell", "wait"]
-            },
-            "next_check_minutes": {
-                "type": "integer"
-            },
-            "reason": {
-                "type": "string"
-            }
-        },
-        "required": ["action", "next_check_minutes", "reason"]
-    }
-}
-
 def call_openai_market_analysis(prompt: str) -> Dict:
     response = openai.responses.create(
-        model="gpt-4o-mini-2024-07-18",
-        temperature=0.2,
+        model="gpt-4o-2024-08-06",
         input=[
-            {"role": "system", "content": "Sei un esperto di trading crypto."},
             {"role": "user", "content": prompt}
         ],
         text={

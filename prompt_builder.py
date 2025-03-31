@@ -6,13 +6,15 @@ def build_prompt(
     candles_1h: List,
     candles_15m: List,
     candles_5m: List,
+    candles_1m: List,
     indicators_4h: Dict,
     indicators_1h: Dict,
     indicators_15m: Dict,
-    indicators_5m: Dict
+    indicators_5m: Dict,
+    indicators_1m: Dict,
 ) -> str:
 
-    def format_candles(candles: List, label: str, limit: int = 15) -> str:
+    def format_candles(candles: List, label: str, limit: int) -> str:
         output = f"\n {label} - ultime {limit} candele:\n"
         for i, c in enumerate(candles[-limit:]):
             output += f"{i+1}) open: {c[1]}, high: {c[2]}, low: {c[3]}, close: {c[4]}, volume: {c[5]}\n"
@@ -30,8 +32,8 @@ def build_prompt(
 
     prompt = f"""
 Simbolo: {symbol}
-Analizza attentamente i dati su più timeframe (1h, 15m, 5m) e suggerisci se aprire una posizione long, short o attendere.
-Voglio fare un trading piuttosto aggressivo sfruttando anche le oscillazioni di breve termine.
+Analizza attentamente i dati su più timeframe (1m, 5m, 15m, 1h) e suggerisci se aprire una posizione long, short o attendere.
+Voglio fare un trading molto aggressivo sfruttando le oscillazioni di brevissimo termine, anche che durino meno di 1 ora.
 Se non è il momento di agire, indica tra quanti minuti rivalutare la situazione e restituisci 0 come take profit e stop loss.
 Se è il momento di agire, suggerisci una percentuale di take profit e stop loss.
 Restituisci un JSON con 5 campi:
@@ -40,15 +42,19 @@ Restituisci un JSON con 5 campi:
 - reason: spiegazione della scelta
 - take_profit_pct: float (percentuale suggerita per TP, es. 1.5 = 1.5%)
 - stop_loss_pct: float (percentuale suggerita per SL, es. 0.8 = 0.8%)
-Non usare mai più di 100 token per la spiegazione.
+Se non è il momento di agire, restituisci nella reason anche un'analisi di cosa attendere nel brevissimo periodo prima di agire.
 
-{format_candles(candles_1h, "Timeframe 1h")}
-{format_indicators("1h", indicators_1h)}
+{format_candles(candles_1m, "Timeframe 1m", 50)}
+{format_indicators("1m", indicators_1m)}
 
-{format_candles(candles_15m, "Timeframe 15m")}
+{format_candles(candles_5m, "Timeframe 5m", 50)}
+{format_indicators("5m", indicators_5m)}
+
+{format_candles(candles_15m, "Timeframe 15m", 20)}
 {format_indicators("15m", indicators_15m)}
 
-{format_candles(candles_5m, "Timeframe 5m")}
-{format_indicators("5m", indicators_5m)}
+{format_candles(candles_1h, "Timeframe 1h", 5)}
+{format_indicators("1h", indicators_1h)}
+
 """
     return prompt.strip()
