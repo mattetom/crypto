@@ -10,7 +10,7 @@ from prompt_builder import build_prompt
 from table_storage import get_crypto_status, update_crypto_status
 
 
-SYMBOL = "WIFUSDT"
+symbolArray = ["WIFUSDT", "CRVUSDT"]
 
 def should_call_openai(status: dict) -> bool:
     if not status:
@@ -27,78 +27,80 @@ def takeDecsion(myTimer: func.TimerRequest) -> None:
     if myTimer.past_due:
         logging.info('The timer is past due!')
 
-    print(f"🔄 Avvio analisi per {SYMBOL} alle {datetime.utcnow().isoformat()}")
+    for SYMBOL in symbolArray:
+        print(f"🔄 Avvio analisi per {SYMBOL} alle {datetime.utcnow().isoformat()}")
 
-    status = get_crypto_status(SYMBOL)
+        status = get_crypto_status(SYMBOL)
 
-    if not should_call_openai(status):
-        print(f"⏳ Prossima analisi per {SYMBOL} dopo le {status['next_check_time']}")
-        return
+        if not should_call_openai(status):
+            print(f"⏳ Prossima analisi per {SYMBOL} dopo le {status['next_check_time']}")
+            continue
 
-    try:
-        candles_4h = get_candles(SYMBOL, "4H", 51)
-        candles_1h = get_candles(SYMBOL, "1H", 51)
-        candles_15m = get_candles(SYMBOL, "15m", 51)
-        candles_5m = get_candles(SYMBOL, "5m", 51)
-        candles_1m = get_candles(SYMBOL, "1m", 51)
+        try:
+            candles_4h = get_candles(SYMBOL, "4H", 51)
+            candles_1h = get_candles(SYMBOL, "1H", 51)
+            candles_15m = get_candles(SYMBOL, "15m", 51)
+            candles_5m = get_candles(SYMBOL, "5m", 51)
+            candles_1m = get_candles(SYMBOL, "1m", 51)
 
-        ind_4h = compute_indicators(candles_4h)
-        ind_1h = compute_indicators(candles_1h)
-        ind_15m = compute_indicators(candles_15m)
-        ind_5m = compute_indicators(candles_5m)
-        ind_1m = compute_indicators(candles_1m)
+            ind_4h = compute_indicators(candles_4h)
+            ind_1h = compute_indicators(candles_1h)
+            ind_15m = compute_indicators(candles_15m)
+            ind_5m = compute_indicators(candles_5m)
+            ind_1m = compute_indicators(candles_1m)
 
-        prompt = build_prompt(
-            symbol=SYMBOL,
-            candles_4h=candles_4h,
-            candles_1h=candles_1h,
-            candles_15m=candles_15m,
-            candles_5m=candles_5m,
-            candles_1m=candles_1m,
-            indicators_4h=ind_4h,
-            indicators_1h=ind_1h,
-            indicators_15m=ind_15m,
-            indicators_5m=ind_5m,
-            indicators_1m=ind_1m
-        )
+            prompt = build_prompt(
+                symbol=SYMBOL,
+                candles_4h=candles_4h,
+                candles_1h=candles_1h,
+                candles_15m=candles_15m,
+                candles_5m=candles_5m,
+                candles_1m=candles_1m,
+                indicators_4h=ind_4h,
+                indicators_1h=ind_1h,
+                indicators_15m=ind_15m,
+                indicators_5m=ind_5m,
+                indicators_1m=ind_1m
+            )
 
-        print(f"📝 Prompt:\n{prompt}")
+            print(f"📝 Prompt:\n{prompt}")
 
-        result = call_openai_market_analysis(prompt)
-        decision = result["decision"]
-        tokens = result["tokens"]
+            result = call_openai_market_analysis(prompt)
+            decision = result["decision"]
+            tokens = result["tokens"]
 
-        update_crypto_status(
-            symbol=SYMBOL,
-            action=decision["action"],
-            next_check_minutes=decision["next_check_minutes"],
-            reason=decision["reason"],
-            take_profit_pct=decision["take_profit_pct"],
-            stop_loss_pct=decision["stop_loss_pct"],
-            token_usage=tokens
-        )
+            update_crypto_status(
+                symbol=SYMBOL,
+                action=decision["action"],
+                next_check_minutes=decision["next_check_minutes"],
+                reason=decision["reason"],
+                take_profit_pct=decision["take_profit_pct"],
+                stop_loss_pct=decision["stop_loss_pct"],
+                token_usage=tokens
+            )
 
-        send_email(
-            subject=f"Analisi di mercato per {SYMBOL}",
-            body=(
-                f"🔄 Analisi completata per {SYMBOL}\n\n"
-                f"✅ Azione: {decision['action'].upper()}\n"
-                f"📈 TP: {decision['take_profit_pct']:.2f}%\n"
-                f"📉 SL: {decision['stop_loss_pct']:.2f}%\n\n"
-                f"⏳ Prossima analisi tra {decision['next_check_minutes']} minuti\n\n"
-                f"Motivo: {decision['reason']}\n\n"
-                f"Token utilizzati: {tokens}\n\n"
-                f"Ultimo aggiornamento: {datetime.utcnow().isoformat()}\n\n\n\n"
-                f"Prompt:\n{prompt}"
-            ),
-            to_email="matteo.tomasini@gmail.com"
-        )
+            send_email(
+                subject=f"Analisi di mercato per {SYMBOL}",
+                body=(
+                    f"🔄 Analisi completata per {SYMBOL}\n\n"
+                    f"✅ Azione: {decision['action'].upper()}\n"
+                    f"📈 TP: {decision['take_profit_pct']:.2f}%\n"
+                    f"📉 SL: {decision['stop_loss_pct']:.2f}%\n\n"
+                    f"⚠️ Risk mode: {decision['risk_mode']}\n\n"
+                    f"⏳ Prossima analisi tra {decision['next_check_minutes']} minuti\n\n"
+                    f"Motivo: {decision['reason']}\n\n"
+                    f"Token utilizzati: {tokens}\n\n"
+                    f"Ultimo aggiornamento: {datetime.utcnow().isoformat()}\n\n\n\n"
+                    f"Prompt:\n{prompt}"
+                ),
+                to_email="matteo.tomasini@gmail.com"
+            )
 
-        print(f"✅ {SYMBOL}: {decision['action'].upper()} | Prossima analisi tra {decision['next_check_minutes']} minuti")
-        print(f"📝 Motivo: {decision['reason']}")
+            print(f"✅ {SYMBOL}: {decision['action'].upper()} | Prossima analisi tra {decision['next_check_minutes']} minuti")
+            print(f"📝 Motivo: {decision['reason']}")
 
-    except Exception as e:
-        print(f"❌ Errore durante l'elaborazione di {SYMBOL}: {e}")
+        except Exception as e:
+            print(f"❌ Errore durante l'elaborazione di {SYMBOL}: {e}")
 
     logging.info('Python timer trigger function executed.')
 

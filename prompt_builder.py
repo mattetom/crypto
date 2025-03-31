@@ -32,10 +32,8 @@ def build_prompt(
 
     prompt = f"""
 Sto operando su {symbol} con i perpetual futures a leva 10x.  
-Posso aprire posizioni long o short.
-
-Voglio fare un trading molto aggressivo sfruttando le oscillazioni di brevissimo termine, anche inferiori a 1 ora.
-
+Posso aprire posizioni long o short.  
+Voglio fare un trading molto aggressivo sfruttando le oscillazioni di brevissimo termine, anche inferiori a 1 ora.  
 Il mio obiettivo è guadagnare in ogni apertura/chiusura di posizione una percentuale netta che superi le fee (0.06% per round trip), ma rimanga contenuta per sfruttare movimenti rapidi.
 
 Suggerisci una strategia di ingresso con questi vincoli:
@@ -45,36 +43,34 @@ Suggerisci una strategia di ingresso con questi vincoli:
 - possibilità di usare trailing stop se vantaggioso
 
 Accetto anche setup deboli ma promettenti, purché il rischio sia contenuto.  
-Se ci sono segnali anticipatori (es. rimbalzo da oversold, divergenze MACD/RSI), valuta comunque l'apertura di una posizione con SL stretto e TP minimo.
-
-Se i segnali tecnici confermano un trend ribassista su più timeframe (MACD negativo, RSI debole, prezzo sotto EMA), valuta attivamente un ingresso short in trend continuativo, anche in assenza di segnali anticipatori.
-
-Se i segnali tecnici confermano un trend rialzista su più timeframe (MACD positivo, RSI forte, prezzo sopra EMA), valuta attivamente un ingresso long in trend continuativo, anche in assenza di segnali anticipatori.
-
-Valuta ingressi anche se lo Stochastic RSI è neutro o non estremo, purché MACD, RSI e andamento delle EMA confermino una direzione coerente.
+Se ci sono segnali anticipatori (es. rimbalzo da oversold, divergenze MACD/RSI), valuta comunque l'apertura di una posizione con SL stretto e TP minimo.  
+Se i segnali tecnici confermano un trend ribassista su più timeframe (MACD negativo, RSI debole, prezzo sotto EMA), valuta attivamente un ingresso short in trend continuativo, anche in assenza di segnali anticipatori.  
+Se i segnali tecnici confermano un trend rialzista su più timeframe (MACD positivo, RSI forte, prezzo sopra EMA), valuta attivamente un ingresso long in trend continuativo, anche in assenza di segnali anticipatori.  
+Valuta ingressi anche se lo Stochastic RSI è neutro o non estremo, purché MACD, RSI e andamento delle EMA confermino una direzione coerente.  
 
 Preferisco agire piuttosto che attendere passivamente.  
 Se i segnali sono misti ma c'è un'opportunità con rischio controllabile, proponi comunque una posizione ridotta piuttosto che "wait".
 
-Imposta `next_check_minutes` a massimo 10 minuti, idealmente 5, per restare reattivi.
+📌 Imposta `next_check_minutes` tra 5 e 30 in base alla forza e alla chiarezza del segnale:
+- Se i segnali sono deboli, misti o il mercato è stagnante, imposta almeno 15 minuti prima della prossima analisi.
+- Se il mercato è attivo o ci sono segnali dinamici, usa 5 o 10 minuti per mantenere alta la reattività.
 
 Se non è il momento di agire, restituisci 0 come take profit e stop loss.  
 Se è il momento di agire, restituisci un JSON con questi 6 campi:
-
 - action: "long" | "short" | "wait"
-- next_check_minutes: int (max 10)
+- next_check_minutes: int (min 5, max 30)
 - reason: spiegazione della scelta
 - take_profit_pct: float
 - stop_loss_pct: float
 - risk_mode: "standard" | "trailing"
 
-{format_candles(candles_5m, "Timeframe 5m", 50)}
+{format_candles(candles_5m, "Timeframe 5m", 40)}
 {format_indicators("5m", indicators_5m)}
 
 {format_candles(candles_15m, "Timeframe 15m", 20)}
 {format_indicators("15m", indicators_15m)}
 
-{format_candles(candles_1h, "Timeframe 1h", 5)}
+{format_candles(candles_1h, "Timeframe 1h", 7)}
 {format_indicators("1h", indicators_1h)}
 
 """

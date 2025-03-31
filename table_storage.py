@@ -17,12 +17,18 @@ def get_crypto_status(symbol: str):
 def update_crypto_status(symbol: str, action: str, next_check_minutes: int, reason: str,
                          take_profit_pct: float = None, stop_loss_pct: float = None,
                          token_usage: int = None):
+    next_check_time = datetime.utcnow() + timedelta(minutes=next_check_minutes)
+    rounded_next_check_time = next_check_time - timedelta(
+        minutes=next_check_time.minute % 5,
+        seconds=next_check_time.second,
+        microseconds=next_check_time.microsecond
+    )
     entity = {
         "PartitionKey": symbol,
         "RowKey": "status",
         "action": action,
         "reason": reason,
-        "next_check_time": (datetime.utcnow() + timedelta(minutes=next_check_minutes)).isoformat(),
+        "next_check_time": rounded_next_check_time.isoformat(),
         "timestamp": datetime.utcnow().isoformat()
     }
 

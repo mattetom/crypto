@@ -21,7 +21,7 @@ def call_openai_market_analysis(prompt: str) -> Dict:
                 "properties": {
                     "action": {
                         "type": "string",
-                        "enum": ["buy", "sell", "wait"]
+                        "enum": ["long", "short", "wait"]
                     },
                     "next_check_minutes": {
                         "type": "integer"
