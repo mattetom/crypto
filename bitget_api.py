@@ -36,7 +36,9 @@ def get_candles(symbol, interval, limit=100):
     response = requests.get(BITGET_API_URL + request_path, headers=headers)
     data = response.json()
     if "data" in data:
-        return response.json()["data"]
+        candles = response.json()["data"]
+        # Escludi l'ultima candela (potenzialmente non chiusa)
+        return candles[:-1]
     else:
         logging.error("Errore nella richiesta API: %s", data)
         return None

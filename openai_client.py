@@ -34,9 +34,13 @@ def call_openai_market_analysis(prompt: str) -> Dict:
                     },
                     "stop_loss_pct": {
                         "type": "number"
+                    },
+                    "risk_mode": {
+                        "type": "string",
+                        "enum": ["standard", "trailing"]
                     }
                 },
-                "required": ["action", "next_check_minutes", "reason", "take_profit_pct", "stop_loss_pct"],
+                "required": ["action", "next_check_minutes", "reason", "take_profit_pct", "stop_loss_pct", "risk_mode"],
                 "additionalProperties": False
             },
             "strict": True

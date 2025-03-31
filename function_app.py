@@ -36,11 +36,11 @@ def takeDecsion(myTimer: func.TimerRequest) -> None:
         return
 
     try:
-        candles_4h = get_candles(SYMBOL, "4H", 50)
-        candles_1h = get_candles(SYMBOL, "1H", 50)
-        candles_15m = get_candles(SYMBOL, "15m", 50)
-        candles_5m = get_candles(SYMBOL, "5m", 50)
-        candles_1m = get_candles(SYMBOL, "1m", 50)
+        candles_4h = get_candles(SYMBOL, "4H", 51)
+        candles_1h = get_candles(SYMBOL, "1H", 51)
+        candles_15m = get_candles(SYMBOL, "15m", 51)
+        candles_5m = get_candles(SYMBOL, "5m", 51)
+        candles_1m = get_candles(SYMBOL, "1m", 51)
 
         ind_4h = compute_indicators(candles_4h)
         ind_1h = compute_indicators(candles_1h)
@@ -61,6 +61,8 @@ def takeDecsion(myTimer: func.TimerRequest) -> None:
             indicators_5m=ind_5m,
             indicators_1m=ind_1m
         )
+
+        print(f"📝 Prompt:\n{prompt}")
 
         result = call_openai_market_analysis(prompt)
         decision = result["decision"]
@@ -86,7 +88,8 @@ def takeDecsion(myTimer: func.TimerRequest) -> None:
                 f"⏳ Prossima analisi tra {decision['next_check_minutes']} minuti\n\n"
                 f"Motivo: {decision['reason']}\n\n"
                 f"Token utilizzati: {tokens}\n\n"
-                f"Ultimo aggiornamento: {datetime.utcnow().isoformat()}"
+                f"Ultimo aggiornamento: {datetime.utcnow().isoformat()}\n\n\n\n"
+                f"Prompt:\n{prompt}"
             ),
             to_email="matteo.tomasini@gmail.com"
         )
