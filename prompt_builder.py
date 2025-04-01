@@ -15,9 +15,10 @@ def build_prompt(
 ) -> str:
 
     def format_candles(candles: List, label: str, limit: int) -> str:
-        output = f"\n {label} - ultime {limit} candele:\n"
+        output = f"\"{label}\": [[open, high, low, close, volume],"
         for i, c in enumerate(candles[-limit:]):
-            output += f"{i+1}) open: {c[1]}, high: {c[2]}, low: {c[3]}, close: {c[4]}, volume: {c[5]}\n"
+            output += f"[{c[1]}, {c[2]}, {c[3]}, {c[4]}, {c[5]}],"
+        output += "]"
         return output
 
     def format_indicators(label: str, ind: Dict) -> str:
@@ -31,47 +32,50 @@ def build_prompt(
         )
 
     prompt = f"""
-Sto operando su {symbol} con i perpetual futures a leva 10x.  
-Posso aprire posizioni long o short.  
-Voglio fare un trading molto aggressivo sfruttando le oscillazioni di brevissimo termine, anche inferiori a 1 ora.  
-Il mio obiettivo è guadagnare in ogni apertura/chiusura di posizione una percentuale netta che superi le fee (0.06% per round trip), ma rimanga contenuta per sfruttare movimenti rapidi.
+Opero su {symbol} (futures perp, leva 10x, long/short).  
+Trading aggressivo su timeframe <1h.  
+Obiettivo: profitti rapidi superiori a fee (0.06% round trip), anche piccoli.
 
-Suggerisci una strategia di ingresso con questi vincoli:
-- take profit ideale: 1.0% - 1.2%
-- stop loss ideale: 0.6% - 0.8%
-- risk_reward_ratio ≥ 1.3
-- possibilità di usare trailing stop se vantaggioso
+Vincoli strategia:
+- TP 1.0-1.2%, SL 0.6-0.8%, RR ≥ 1.3
+- Usa trailing stop se utile
+- Accetta setup deboli con rischio contenuto
+- Agisci se trend chiaro o segnali anticipatori (divergenze, rimbalzi, ecc.)
+- Evita ingressi se probabilità successo bassa
 
-Accetto anche setup deboli ma promettenti, purché il rischio sia contenuto.  
-Se ci sono segnali anticipatori (es. rimbalzo da oversold, divergenze MACD/RSI), valuta comunque l'apertura di una posizione con SL stretto e TP minimo.  
-Se i segnali tecnici confermano un trend ribassista su più timeframe (MACD negativo, RSI debole, prezzo sotto EMA), valuta attivamente un ingresso short in trend continuativo, anche in assenza di segnali anticipatori.  
-Se i segnali tecnici confermano un trend rialzista su più timeframe (MACD positivo, RSI forte, prezzo sopra EMA), valuta attivamente un ingresso long in trend continuativo, anche in assenza di segnali anticipatori.  
-Valuta ingressi anche se lo Stochastic RSI è neutro o non estremo, purché MACD, RSI e andamento delle EMA confermino una direzione coerente.  
+Frequenza analisi:
+- 5-10 minuti se segnali forti o mercato attivo
+- ≥15 min (fino a 30) se segnali misti o stagnazione
 
-Preferisco agire piuttosto che attendere passivamente.  
-Se i segnali sono misti ma c'è un'opportunità con rischio controllabile, proponi comunque una posizione ridotta piuttosto che "wait".
+Input:  
+Candlestick OHLCV di 3 timeframe (5m, 15m, 1h), **ordinate dalla più vecchia alla più recente**  
+Calcola tu EMA, MACD, RSI, Stoch RSI, ATR.
 
-📌 Imposta `next_check_minutes` tra 5 e 30 in base alla forza e alla chiarezza del segnale:
-- Se i segnali sono deboli, misti o il mercato è stagnante, imposta almeno 15 minuti prima della prossima analisi.
-- Se il mercato è attivo o ci sono segnali dinamici, usa 5 o 10 minuti per mantenere alta la reattività.
-
-Se non è il momento di agire, restituisci 0 come take profit e stop loss.  
-Se è il momento di agire, restituisci un JSON con questi 6 campi:
-- action: "long" | "short" | "wait"
-- next_check_minutes: int (min 5, max 30)
-- reason: spiegazione della scelta
-- take_profit_pct: float
-- stop_loss_pct: float
-- risk_mode: "standard" | "trailing"
-
-{format_candles(candles_5m, "Timeframe 5m", 40)}
-{format_indicators("5m", indicators_5m)}
-
-{format_candles(candles_15m, "Timeframe 15m", 20)}
-{format_indicators("15m", indicators_15m)}
-
-{format_candles(candles_1h, "Timeframe 1h", 7)}
-{format_indicators("1h", indicators_1h)}
-
+Output JSON:
+{{
+  "action": "long" | "short" | "wait",
+  "next_check_minutes": 5-30,
+  "reason": "...",
+  "take_profit_pct": float,
+  "stop_loss_pct": float,
+  "risk_mode": "standard" | "trailing"
+}}
+Se wait, TP e SL = 0.
 """
-    return prompt.strip()
+    # return prompt.strip()
+    input = [
+        {
+        "role": "system",
+        "content": "Sei un analista di crypto trading. Riceverai candele OHLCV su 3 timeframe. Calcola gli indicatori EMA20, EMA50, MACD, RSI, Stochastic RSI e ATR e suggerisci se aprire una posizione, con logica aggressiva ma prudente come specificato dall'utente."
+        },
+        {
+        "role": "user",
+        "content": prompt.strip()
+        },
+        {
+        "role": "user",
+        "content": f"{ {format_candles(candles_5m, 'Timeframe 5m', 40)}, {format_candles(candles_15m, 'Timeframe 15m', 40)}, {format_candles(candles_1h, 'Timeframe 1h', 40)} }"
+        }
+    ]
+    return input
+

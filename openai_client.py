@@ -8,10 +8,8 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def call_openai_market_analysis(prompt: str) -> Dict:
     response = openai.responses.create(
-        model="gpt-4o-2024-08-06",
-        input=[
-            {"role": "user", "content": prompt}
-        ],
+        model="gpt-4o-2024-11-20",
+        input=prompt,
         text={
         "format": {
             "type": "json_schema",
