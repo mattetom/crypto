@@ -37,11 +37,12 @@ Trading aggressivo su timeframe <1h.
 Obiettivo: profitti rapidi superiori a fee (0.06% round trip), anche piccoli.
 
 Vincoli strategia:
-- TP 1.0-1.2%, SL 0.6-0.8%, RR ≥ 1.3
+- Determina TP e SL basandoti su livelli tecnici significativi come supporti e resistenze individuati nell'analisi dei dati.
 - Usa trailing stop se utile
 - Accetta setup deboli con rischio contenuto
 - Agisci se trend chiaro o segnali anticipatori (divergenze, rimbalzi, ecc.)
 - Evita ingressi se probabilità successo bassa
+- Evita ingressi contro il trend principale su timeframe 1h, a meno di segnali forti e chiari (pattern di inversione, divergenze marcate, volumi e struttura coerente)
 
 Frequenza analisi:
 - 5-10 minuti se segnali forti o mercato attivo
@@ -56,11 +57,11 @@ Output JSON:
   "action": "long" | "short" | "wait",
   "next_check_minutes": 5-30,
   "reason": "...",
-  "take_profit_pct": float,
-  "stop_loss_pct": float,
+  "take_profit_price": float,
+  "stop_loss_price": float,
   "risk_mode": "standard" | "trailing"
 }}
-Se wait, TP e SL = 0.
+Se wait, TP e SL = 0."
 """
     # return prompt.strip()
     input = [
